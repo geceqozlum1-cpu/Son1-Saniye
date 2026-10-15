@@ -1,7 +1,3 @@
-# SON 1 SANİYE V9 — Android
-
-SON 1 SANİYE refleks oyununun Android WebView sürümü. `app/src/main/assets/index.html` çevrimdışı oyunu içerir.
-
-APK GitHub Actions üzerinde otomatik derlenir. Derleme tamamlandığında Actions ekranındaki `SON_1_SANIYE_V9_ANDROID_DEBUG_APK` artefaktında bulunur.
-
-Firebase çevrim içi ligleri ayrıca yapılandırılmadan canlı değildir.
+# SON 1 SANİYE V9 APK
+GitHub Actions otomatik APK derleme deposu. **Actions > Build Android APK** üzerinden derleme durumunu kontrol edin. Başarılı olursa **SON_1_SANIYE_APK** adlı artifact ZIP'inde `app-debug.apk` bulunur.
+Firebase ligleri ayrıca canlıya alınmadan çevrim içi değildir.
