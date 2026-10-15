@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() {return request.auth != null;}
+    function member(lid) {return signed() && exists(/databases/$(database)/documents/leagues/$(lid)/members/$(request.auth.uid));}
+    match /leagues/{lid} {
+      allow read: if member(lid);
+      allow write: if false;
+      match /members/{uid} { allow read: if member(lid); allow write: if false; }
+      match /matches/{mid} { allow read: if member(lid); allow write: if false; }
+    }
+    match /profiles/{uid} {
+      allow read: if signed() && request.auth.uid == uid;
+      allow write: if false;
+      match /leagues/{lid} {allow read: if signed() && request.auth.uid == uid;allow write: if false;}
+    }
+    match /leagueCodes/{code} {allow read, write: if false;}
+    match /leagueMatchTickets/{mid} {allow read, write: if false;}
+    match /{document=**} {allow read, write: if false;}
+  }
+}

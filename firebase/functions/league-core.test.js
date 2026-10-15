@@ -1,0 +1,10 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),core=require('./league-core');
+test('seed stable',()=>{assert.equal(core.seedOf('league','2026-10-15'),core.seedOf('league','2026-10-15'));assert.notEqual(core.seedOf('league','2026-10-15'),core.seedOf('league','2026-10-16'))});
+test('rounds deterministic',()=>assert.deepEqual(core.newRounds(22),core.newRounds(22)));
+test('empty events are safe and capped',()=>{const result=core.scoreEvents(core.newRounds(22),[]);assert.ok(result.score>=0);assert.equal(result.rounds.length,12)});
+test('green click scores from server side event log',()=>{const rounds=[{i:0,color:'green'}];const {score,good}=core.scoreEvents(rounds,[{i:0,t:125}]);assert.ok(score>0);assert.equal(good,1)});
+test('blue requires two taps in interval',()=>{const rounds=[{i:0,color:'blue'}];assert.equal(core.scoreEvents(rounds,[{i:0,t:100}]).score,0);assert.ok(core.scoreEvents(rounds,[{i:0,t:100},{i:0,t:250}]).score>0);assert.equal(core.scoreEvents(rounds,[{i:0,t:100},{i:0,t:650}]).score,0)});
+test('black loses all score',()=>{const rounds=[{i:0,color:'green'},{i:1,color:'black'}];const out=core.scoreEvents(rounds,[{i:0,t:100},{i:1,t:1400}]);assert.equal(out.score,0);assert.equal(out.dead,true)});
+test('red and black reward not touching',()=>{const rounds=[{i:0,color:'red'},{i:1,color:'black'}];assert.equal(core.scoreEvents(rounds,[]).score,960)});
+test('invalid logs rejected',()=>{const r=core.newRounds(1);assert.throws(()=>core.scoreEvents(r,[{i:0,t:200},{i:0,t:150}]));assert.throws(()=>core.scoreEvents(r,[{i:0,t:200},{i:0,t:240},{i:0,t:280}]));assert.throws(()=>core.scoreEvents(r,[{i:0,t:999999}]))});

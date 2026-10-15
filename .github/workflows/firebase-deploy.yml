@@ -26,7 +26,6 @@ jobs:
           test -n "$FIREBASE_WEB_CONFIG_JSON" || { echo "Missing FIREBASE_WEB_CONFIG_JSON"; exit 1; }
           test -n "$WIF_PROVIDER" || { echo "Missing GCP_WORKLOAD_IDENTITY_PROVIDER"; exit 1; }
           test -n "$DEPLOY_SA" || { echo "Missing GCP_DEPLOY_SERVICE_ACCOUNT"; exit 1; }
-          unzip -q firebase/backend-sources.zip -d firebase
           python3 scripts/inject_firebase_config.py app/src/main/assets/index.html firebase/public/index.html
       - uses: google-github-actions/auth@v2
         with:

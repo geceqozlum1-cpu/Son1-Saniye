@@ -1,0 +1,33 @@
+{
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22"
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "auth": {
+    "authorizedDomains": [
+      "son-1-saniye-78761.firebaseapp.com",
+      "son-1-saniye-78761.web.app",
+      "appassets.androidplatform.net"
+    ],
+    "providers": {
+      "anonymous": true
+    }
+  }
+}

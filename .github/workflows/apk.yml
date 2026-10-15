@@ -7,6 +7,7 @@ on:
       - '*.gradle.kts'
       - 'gradle.properties'
       - 'scripts/inject_firebase_config.py'
+      - 'firebase/web-config.json'
       - '.github/workflows/apk.yml'
   workflow_dispatch:
 jobs:
@@ -23,7 +24,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Embed Firebase configuration if provided
+      - name: Embed Firebase project configuration
         env:
           FIREBASE_WEB_CONFIG_JSON: ${{ vars.FIREBASE_WEB_CONFIG_JSON }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}

@@ -4,6 +4,9 @@ source=pathlib.Path(sys.argv[1] if len(sys.argv)>1 else 'app/src/main/assets/ind
 dest=pathlib.Path(sys.argv[2] if len(sys.argv)>2 else str(source))
 data=os.getenv('FIREBASE_WEB_CONFIG_JSON','').strip()
 if not data:
+ config_file=pathlib.Path(__file__).resolve().parent.parent/'firebase/web-config.json'
+ if config_file.exists():data=config_file.read_text('utf-8')
+if not data:
  if source!=dest:
   dest.parent.mkdir(parents=True,exist_ok=True)
   dest.write_bytes(source.read_bytes())
