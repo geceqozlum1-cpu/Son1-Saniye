@@ -3,11 +3,11 @@ android {
  namespace = "com.sonbirsaniye.arcade"
  compileSdk = 35
  defaultConfig {
-  applicationId = "com.sonbirsaniye.arcade"
+  applicationId = "com.sonbirsaniye.cosmicv14fixed"
   minSdk = 26
   targetSdk = 35
-  versionCode = 13
-  versionName = "10.0"
+  versionCode = 15
+  versionName = "14.2"
  }
  buildTypes { getByName("release") { isMinifyEnabled = false } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
