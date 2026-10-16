@@ -1,4 +1,4 @@
-name: Deploy Firebase Leagues
+name: Deploy Spark Free Leagues
 on:
   workflow_dispatch:
 permissions:
@@ -15,29 +15,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify Firebase project variables
+      - name: Require existing Firebase deployment identity
         env:
-          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
-          FIREBASE_WEB_CONFIG_JSON: ${{ vars.FIREBASE_WEB_CONFIG_JSON }}
           WIF_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           DEPLOY_SA: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
         run: |
-          test -n "$FIREBASE_PROJECT_ID" || { echo "Missing FIREBASE_PROJECT_ID"; exit 1; }
-          test -n "$FIREBASE_WEB_CONFIG_JSON" || { echo "Missing FIREBASE_WEB_CONFIG_JSON"; exit 1; }
-          test -n "$WIF_PROVIDER" || { echo "Missing GCP_WORKLOAD_IDENTITY_PROVIDER"; exit 1; }
-          test -n "$DEPLOY_SA" || { echo "Missing GCP_DEPLOY_SERVICE_ACCOUNT"; exit 1; }
-          python3 scripts/inject_firebase_config.py app/src/main/assets/index.html firebase/public/index.html
+          test -n "$WIF_PROVIDER" || { echo "Firebase account authorization is required; no billing changes were attempted."; exit 1; }
+          test -n "$DEPLOY_SA" || { echo "Firebase deployment identity is missing."; exit 1; }
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
-      - name: Test league scoring
-        run: node --test firebase/functions/league-core.test.js
-      - name: Install Firebase CLI and functions packages
-        run: |
-          npm install -g firebase-tools
-          npm install --prefix firebase/functions --omit=dev
-      - name: Deploy Hosting, Functions, Firestore rules
-        env:
-          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
-        run: firebase deploy --config firebase/firebase.json --project "$FIREBASE_PROJECT_ID" --only firestore:rules,functions,hosting --non-interactive
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Verify billing disabled and deploy only free services
+        run: python3 scripts/deploy_free.py

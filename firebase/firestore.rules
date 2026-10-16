@@ -1,21 +1,168 @@
 rules_version = '2';
+// Spark-only league schema. No Functions are used and no client can edit another member.
+// freeLeagues: invite-code metadata; members: public aliases and bounded scores;
+// tickets: one private active match per member; freeProfiles: private membership quota.
+// Limits: 5 memberships/account, 100 members/league, 20 attempts/member/UTC day.
 service cloud.firestore {
-  match /databases/{database}/documents {
-    function signed() {return request.auth != null;}
-    function member(lid) {return signed() && exists(/databases/$(database)/documents/leagues/$(lid)/members/$(request.auth.uid));}
-    match /leagues/{lid} {
-      allow read: if member(lid);
-      allow write: if false;
-      match /members/{uid} { allow read: if member(lid); allow write: if false; }
-      match /matches/{mid} { allow read: if member(lid); allow write: if false; }
-    }
-    match /profiles/{uid} {
-      allow read: if signed() && request.auth.uid == uid;
-      allow write: if false;
-      match /leagues/{lid} {allow read: if signed() && request.auth.uid == uid;allow write: if false;}
-    }
-    match /leagueCodes/{code} {allow read, write: if false;}
-    match /leagueMatchTickets/{mid} {allow read, write: if false;}
-    match /{document=**} {allow read, write: if false;}
+ match /databases/{database}/documents {
+  function signed(){return request.auth != null;}
+  function own(uid){return signed() && request.auth.uid == uid;}
+  function validCode(code){return code is string && code.matches('^[A-HJ-NP-Z2-9]{7}$');}
+  function lp(c){return /databases/$(database)/documents/freeLeagues/$(c);}
+  function mp(c,u){return /databases/$(database)/documents/freeLeagues/$(c)/members/$(u);}
+  function tp(c,u){return /databases/$(database)/documents/freeLeagues/$(c)/tickets/$(u);}
+  function pp(u){return /databases/$(database)/documents/freeProfiles/$(u);}
+  function ip(c,u){return /databases/$(database)/documents/profiles/$(u)/freeLeagues/$(c);}
+  function member(c){return signed() && exists(mp(c,request.auth.uid));}
+  function today(){return int(request.time.toMillis() / 86400000);}
+  function shortName(s,n){return s is string && s.size()>0 && s.size()<=n;}
+  function memberShape(d,u){
+   return d.keys().hasAll(['uid','alias','best','total','played','dayKey','lastMatch','joinedAt','updatedAt'])
+    && d.keys().hasOnly(['uid','alias','best','total','played','dayKey','lastMatch','joinedAt','updatedAt'])
+    && d.uid==u && shortName(d.alias,18) && d.best is int && d.best>=0 && d.best<=8400
+    && d.total is int && d.total>=0 && d.total<=168000 && d.played is int && d.played>=0 && d.played<=20
+    && d.dayKey is int && d.dayKey>=-1 && d.dayKey<=today() && d.lastMatch is string && d.lastMatch.size()<=36
+    && d.joinedAt is timestamp && d.updatedAt==request.time;
   }
+  function sameMember(d,o){return d.uid==o.uid && d.alias==o.alias && d.joinedAt==o.joinedAt;}
+  function startMember(c,u,d,o){
+   let t=getAfter(tp(c,u)).data;
+   return t.status=='playing' && t.startedAt==request.time && d.lastMatch==t.matchId
+    && d.dayKey==today() && d.played==(o.dayKey==today()?o.played+1:1)
+    && d.best==(o.dayKey==today()?o.best:0) && d.total==(o.dayKey==today()?o.total:0);
+  }
+  function finishMember(c,u,d,o){
+   let before=get(tp(c,u)).data;
+   let after=getAfter(tp(c,u)).data;
+   return before.status=='playing' && after.status=='saved' && after.completedAt==request.time
+    && after.matchId==o.lastMatch && d.lastMatch==o.lastMatch && d.dayKey==o.dayKey && d.played==o.played
+    && d.best==(o.best>after.score?o.best:after.score) && d.total==o.total+after.score;
+  }
+  function color(seed,day,i){let r=(seed*17+day*31+i*43+i*i*7)%101;return i==0?0:(r<45?0:(r<70?1:(r<89?2:3)));}
+  function validPartRound(t,p,i,seed,day,off){
+   let a=t[2*i];let b=t[2*i+1];let v=p[i];let c=color(seed,day,i+off);
+   return a is int && b is int && v is int && a>=-1 && a<=950 && b>=-1 && b<=950
+    && (b==-1 || (a>=0 && b>=a))
+    && v==(c==0?(a>=0 && b==-1?500:0):(c==1?(a>=0 && b-a>=75 && b-a<=480?700:0):(c==2?(a==-1?250:0):(a==-1?400:-1))));
+  }
+  function validPart(d,seed,day,n){
+   let off=n=='0'?0:(n=='1'?4:8);
+   return d.t is list && d.t.size()==8 && d.p is list && d.p.size()==4
+    && validPartRound(d.t,d.p,0,seed,day,off) && validPartRound(d.t,d.p,1,seed,day,off)
+    && validPartRound(d.t,d.p,2,seed,day,off) && validPartRound(d.t,d.p,3,seed,day,off)
+    && d.dead==d.p.hasAny([-1]) && d.sum==d.p[0]+d.p[1]+d.p[2]+d.p[3]
+    && d.good==(d.p[0]>0?1:0)+(d.p[1]>0?1:0)+(d.p[2]>0?1:0)+(d.p[3]>0?1:0);
+  }
+  function part(c,u,n){return getAfter(/databases/$(database)/documents/freeLeagues/$(c)/tickets/$(u)/parts/$(n)).data;}
+  function validScore(c,u,d){
+   let a=part(c,u,'0');let b=part(c,u,'1');let cpart=part(c,u,'2');
+   return a.matchId==d.matchId && b.matchId==d.matchId && cpart.matchId==d.matchId
+    && a.updatedAt==request.time && b.updatedAt==request.time && cpart.updatedAt==request.time
+    && d.dead==(a.dead || b.dead || cpart.dead)
+    && d.score==(d.dead?0:a.sum+b.sum+cpart.sum) && d.good==(d.dead?0:a.good+b.good+cpart.good);
+  }
+  function ticketStart(c,u,d){
+   let before=get(mp(c,u)).data;let after=getAfter(mp(c,u)).data;
+   return d.keys().hasAll(['uid','matchId','status','startedAt','dayKey'])
+    && d.keys().hasOnly(['uid','matchId','status','startedAt','dayKey'])
+    && d.uid==u && d.matchId is string && d.matchId.matches('^[a-f0-9-]{36}$')
+    && d.status=='playing' && d.startedAt==request.time && d.dayKey==today()
+    && after.lastMatch==d.matchId && after.updatedAt==request.time
+    && after.played==(before.dayKey==today()?before.played+1:1) && after.played<=20;
+  }
+  function ticketSave(c,u,d,o){
+   let m=getAfter(mp(c,u)).data;
+   return d.keys().hasAll(['uid','matchId','status','startedAt','dayKey','completedAt','score','good','dead'])
+    && d.keys().hasOnly(['uid','matchId','status','startedAt','dayKey','completedAt','score','good','dead'])
+    && d.uid==o.uid && d.matchId==o.matchId && d.startedAt==o.startedAt && d.dayKey==o.dayKey
+    && o.status=='playing' && d.status=='saved' && d.completedAt==request.time && d.dayKey==today()
+    && request.time>=o.startedAt && request.time<=o.startedAt+duration.value(240,'s')
+    && d.score is int && d.good is int && d.dead is bool
+    && (d.dead || request.time>=o.startedAt+duration.value(16200,'ms'))
+    && validScore(c,u,d)
+    && m.lastMatch==o.matchId && m.updatedAt==request.time;
+  }
+  match /freeLeagues/{c} {
+   // Invite metadata contains no email, tokens, roster or private profile data.
+   allow get: if signed() && validCode(c);
+   allow list: if false;
+   allow create: if signed() && validCode(c)
+    && request.resource.data.keys().hasAll(['name','code','ownerUid','memberCount','seed','createdAt'])
+    && request.resource.data.keys().hasOnly(['name','code','ownerUid','memberCount','seed','createdAt'])
+    && shortName(request.resource.data.name,30) && request.resource.data.name.size()>=3
+    && request.resource.data.code==c && request.resource.data.ownerUid==request.auth.uid
+    && request.resource.data.memberCount==1 && request.resource.data.seed is int
+    && request.resource.data.seed>=1 && request.resource.data.seed<=1000000
+    && request.resource.data.createdAt==request.time
+    && getAfter(mp(c,request.auth.uid)).data.uid==request.auth.uid
+    && getAfter(ip(c,request.auth.uid)).data.leagueId==c;
+   allow update: if signed() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount'])
+    && request.resource.data.memberCount==resource.data.memberCount+1 && request.resource.data.memberCount<=100
+    && !exists(mp(c,request.auth.uid)) && getAfter(mp(c,request.auth.uid)).data.uid==request.auth.uid
+    && getAfter(ip(c,request.auth.uid)).data.leagueId==c;
+   allow delete: if false;
+   match /members/{u} {
+    allow get: if own(u) || member(c);
+    allow list: if member(c) && request.query.limit<=100;
+    allow create: if own(u) && validCode(c) && memberShape(request.resource.data,u)
+     && request.resource.data.best==0 && request.resource.data.total==0 && request.resource.data.played==0
+     && request.resource.data.dayKey==-1 && request.resource.data.lastMatch=='' && request.resource.data.joinedAt==request.time
+     && getAfter(lp(c)).data.memberCount==(exists(lp(c))?get(lp(c)).data.memberCount+1:1)
+     && getAfter(ip(c,u)).data.leagueId==c && getAfter(pp(u)).data.lastLeague==c
+     && getAfter(pp(u)).data.updatedAt==request.time;
+    allow update: if own(u) && exists(lp(c)) && memberShape(request.resource.data,u)
+     && sameMember(request.resource.data,resource.data)
+     && (startMember(c,u,request.resource.data,resource.data) || finishMember(c,u,request.resource.data,resource.data));
+    allow delete: if false;
+   }
+   match /tickets/{u} {
+    allow get: if own(u);
+    match /parts/{n} {
+     allow get: if own(u);
+     allow list,delete: if false;
+     allow create,update: if own(u) && n in ['0','1','2']
+      && request.resource.data.keys().hasAll(['matchId','t','p','sum','good','dead','updatedAt'])
+      && request.resource.data.keys().hasOnly(['matchId','t','p','sum','good','dead','updatedAt'])
+      && request.resource.data.matchId==get(tp(c,u)).data.matchId && get(tp(c,u)).data.status=='playing'
+      && getAfter(tp(c,u)).data.status=='saved' && getAfter(tp(c,u)).data.completedAt==request.time
+      && request.resource.data.updatedAt==request.time
+      && validPart(request.resource.data,get(lp(c)).data.seed,get(tp(c,u)).data.dayKey,n);
+    }
+    allow list,delete: if false;
+    allow create: if own(u) && member(c) && ticketStart(c,u,request.resource.data);
+    allow update: if own(u) && member(c) && (
+     (ticketStart(c,u,request.resource.data) && request.resource.data.matchId!=resource.data.matchId
+      && (resource.data.status!='playing' || resource.data.dayKey!=today() || request.time>resource.data.startedAt+duration.value(240,'s')))
+     || ticketSave(c,u,request.resource.data,resource.data)
+     || (resource.data.status=='playing' && request.resource.data.status=='aborted'
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completedAt'])
+      && request.resource.data.completedAt==request.time));
+   }
+  }
+  match /freeProfiles/{u} {
+   allow get: if own(u);
+   allow list,delete: if false;
+   allow create,update: if own(u)
+    && request.resource.data.keys().hasAll(['count','lastLeague','updatedAt'])
+    && request.resource.data.keys().hasOnly(['count','lastLeague','updatedAt'])
+    && request.resource.data.count is int && request.resource.data.count>=1 && request.resource.data.count<=5
+    && request.resource.data.count==(exists(pp(u))?resource.data.count+1:1)
+    && validCode(request.resource.data.lastLeague) && request.resource.data.updatedAt==request.time
+    && !exists(mp(request.resource.data.lastLeague,u))
+    && getAfter(mp(request.resource.data.lastLeague,u)).data.uid==u
+    && getAfter(ip(request.resource.data.lastLeague,u)).data.leagueId==request.resource.data.lastLeague;
+  }
+  match /profiles/{u}/freeLeagues/{c} {
+   allow get: if own(u);
+   allow list: if own(u) && request.query.limit<=5;
+   allow create: if own(u) && validCode(c)
+    && request.resource.data.keys().hasAll(['leagueId','code','name','joinedAt'])
+    && request.resource.data.keys().hasOnly(['leagueId','code','name','joinedAt'])
+    && request.resource.data.leagueId==c && request.resource.data.code==c
+    && request.resource.data.name==getAfter(lp(c)).data.name && request.resource.data.joinedAt==request.time
+    && !exists(mp(c,u)) && getAfter(mp(c,u)).data.uid==u;
+   allow update,delete: if false;
+  }
+  match /{document=**}{allow read,write: if false;}
+ }
 }

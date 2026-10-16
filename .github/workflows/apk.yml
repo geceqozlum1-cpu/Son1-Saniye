@@ -8,10 +8,42 @@ on:
       - 'gradle.properties'
       - 'scripts/inject_firebase_config.py'
       - 'firebase/web-config.json'
+      - 'online/**'
+      - 'tests/**'
+      - 'firebase/firestore.rules'
+      - 'scripts/build_online.py'
+      - 'package*.json'
       - '.github/workflows/apk.yml'
   workflow_dispatch:
 jobs:
+  league-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - name: Verify free-only deployment guard
+        run: python3 tests/test_deploy_free.py
+      - name: Verify two-user matches and security rules in emulator
+        run: npx -y firebase-tools@latest emulators:exec --only firestore --project demo-son1-free --config firebase/emulator.json "node --test tests/free-league.test.cjs"
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium --only-shell
+      - name: Verify mobile and desktop online flows in emulator
+        run: npx -y firebase-tools@latest emulators:exec --only firestore,auth --project demo-son1-free --config firebase/emulator.json "node tests/browser-online.cjs"
   build:
+    needs: league-tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,6 +56,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Bundle Spark league modules
+        run: python3 scripts/build_online.py
       - name: Embed Firebase project configuration
         env:
           FIREBASE_WEB_CONFIG_JSON: ${{ vars.FIREBASE_WEB_CONFIG_JSON }}
@@ -43,6 +77,6 @@ jobs:
         run: test -s app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: SON_1_SANIYE_V9_FIREBASE_READY_APK
+          name: SON_1_SANIYE_V9_2_SPARK_APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

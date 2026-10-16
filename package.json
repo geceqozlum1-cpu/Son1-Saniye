@@ -1,0 +1,14 @@
+{
+  "name": "son1-saniye",
+  "version": "9.2.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/free-league.test.cjs",
+    "build:online": "python3 scripts/build_online.py"
+  },
+  "devDependencies": {
+    "firebase": "12.19.0",
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "playwright": "1.51.1"
+  }
+}

@@ -1,20 +1,14 @@
-# SON 1 SANİYE V9 — Firebase Çevrim İçi Ligler
+# Firebase V9.2 — ücretsiz kurulum
 
-Bu repo artık Firebase config eklenmesini destekleyen APK derleme iş akışı ve manuel Firebase deploy iş akışı içerir. **Firebase projesi henüz bu repoya bağlanmadıysa çevrim içi ligler canlı değildir.**
+Hedef proje: `son-1-saniye-78761`. Android uygulama kimliği: `com.sonbirsaniye.arcade`. WebView içindeki JavaScript Firebase SDK'sı kullanılır; Analytics Gradle eklentisi ligleri çalıştırmak için gerekli değildir. Firebase'deki `Son.Saniye` adlı ayrı Android kaydı bu APK'nin paket adıyla eşleşmez, fakat web SDK bağlantısı o kaydı kullanmaz.
 
-## Gerekli GitHub Actions değişkenleri
-Depo: Settings → Secrets and variables → Actions → Variables:
-- FIREBASE_PROJECT_ID: Firebase proje ID
-- FIREBASE_WEB_CONFIG_JSON: Firebase Web App yapılandırma JSON'u. Yalnızca istemci anahtarı; hizmet hesabı özel anahtarı koymayın.
-- GCP_WORKLOAD_IDENTITY_PROVIDER: Google Cloud Workload Identity Provider kaynak adı
-- GCP_DEPLOY_SERVICE_ACCOUNT: WIF'a bağlı, gerekli en az IAM izinlerine sahip dağıtım servis hesabı
+Eski Cloud Functions dağıtımı ücretsiz çözümden çıkarıldı. Yeni veri alanları: `freeLeagues`, `freeProfiles`, `profiles/{uid}/freeLeagues`. Eski `leagues` istemcileri yeni kurallarla yazma izni alamaz; V9.2 gereklidir.
 
-## Firebase Console hazırlığı
-Proje sahibi Firebase Console'da Anonymous Authentication ve Firestore (default) veritabanını etkinleştirmelidir. Cloud Functions için **Blaze planı** gerekir ve ücret doğabilir; maliyet uyarısı tanımlayın. WIF kimliğini yalnızca \`geceqozlum1-cpu/Son1-Saniye\` deposuna sınırlandırın.
+Yetkilendirilmiş hesapla `scripts/deploy_free.py` kullanılır. Betik:
+1. Faturalandırmanın kapalı olduğunu `gcloud billing projects describe` ile doğrular.
+2. Veritabanlarını listeler; var olan tek Standard `(default)` veritabanını kullanır. Hiç veritabanı yoksa ücretsiz ilk Standard veritabanını `europe-west1` bölgesinde oluşturur. Başka veritabanı varsa ikinciyi oluşturmaz.
+3. Auth, kurallar ve Hosting'i yayımlar. Functions veya diğer ücretli ürünleri dağıtmaz.
 
-## Çalıştırma sırası
-1. Actions → **Deploy Firebase Leagues** → Run workflow (sadece proje ve yetkiler kurulunca).
-2. Actions → **Build Android APK** → Run workflow; Artifacts altında \`SON_1_SANIYE_V9_FIREBASE_READY_APK\` paketindeki app-debug.apk dosyasını indirin.
-3. İki farklı cihazla kodla lige katılma, maçı sunucuya gönderme ve canlı skoru kontrol edin.
+Dış kimlik gereksinimi: GitHub iş akışı için `GCP_WORKLOAD_IDENTITY_PROVIDER` ve `GCP_DEPLOY_SERVICE_ACCOUNT` değişkenleri yetkili Google hesabıyla kurulmuş olmalı. Bunlar uygulama yapılandırması veya kullanıcıdan istenen kod değildir. Mevcut oturum bu kimliklere erişemiyorsa yayımlama gerçekleşmez.
 
-APK'deki Firebase yapılandırması otomatik eklenir, ama sunucu yayımlanana kadar bağlanamaz. Sunucu skor yeniden hesaplar; tam hile koruması değildir. Yerel kozmetik/ödüller cihazlar arasında henüz senkronize değildir.
+16 Ekim 2026 durumu: Kaynaklar ve emülatör testleri hazır; mevcut Firebase CLI oturumu yok. Canlı veritabanı oluşturma, kuralların yayını ve iki gerçek kullanıcıyla sunucu testi yapılmadı. Yeni APK, bu işlemler tamamlanmadan çalışan çevrim içi yayın olarak tanıtılmamalı.
