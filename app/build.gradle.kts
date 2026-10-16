@@ -6,8 +6,8 @@ android {
   applicationId = "com.sonbirsaniye.arcade"
   minSdk = 26
   targetSdk = 35
-  versionCode = 11
-  versionName = "9.2"
+  versionCode = 12
+  versionName = "9.3"
  }
  buildTypes { getByName("release") { isMinifyEnabled = false } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

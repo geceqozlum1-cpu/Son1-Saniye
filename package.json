@@ -1,9 +1,9 @@
 {
   "name": "son1-saniye",
-  "version": "9.2.0",
+  "version": "9.3.0",
   "private": true,
   "scripts": {
-    "test": "node --test tests/free-league.test.cjs",
+    "test": "node --test --test-concurrency=1 tests/free-league.test.cjs tests/duel.test.cjs",
     "build:online": "python3 scripts/build_online.py"
   },
   "devDependencies": {

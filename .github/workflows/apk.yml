@@ -37,11 +37,11 @@ jobs:
       - name: Verify free-only deployment guard
         run: python3 tests/test_deploy_free.py
       - name: Verify two-user matches and security rules in emulator
-        run: npx -y firebase-tools@latest emulators:exec --only firestore --project demo-son1-free --config firebase/emulator.json "node --test tests/free-league.test.cjs"
+        run: npx -y firebase-tools@latest emulators:exec --only firestore --project demo-son1-free --config firebase/emulator.json "node --test --test-concurrency=1 tests/free-league.test.cjs tests/duel.test.cjs"
       - name: Install test browser
         run: npx playwright install --with-deps chromium --only-shell
       - name: Verify mobile and desktop online flows in emulator
-        run: npx -y firebase-tools@latest emulators:exec --only firestore,auth --project demo-son1-free --config firebase/emulator.json "node tests/browser-online.cjs"
+        run: npx -y firebase-tools@latest emulators:exec --only firestore,auth --project demo-son1-free --config firebase/emulator.json "node tests/browser-online.cjs && node tests/browser-duel.cjs"
   build:
     needs: league-tests
     runs-on: ubuntu-latest
@@ -77,6 +77,6 @@ jobs:
         run: test -s app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: SON_1_SANIYE_V9_2_SPARK_APK
+          name: SON_1_SANIYE_V9_3_DUEL_APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

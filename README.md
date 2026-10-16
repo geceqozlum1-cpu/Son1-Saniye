@@ -1,8 +1,19 @@
-# SON 1 SANİYE V9.2 — Spark ligleri
+# SON 1 SANİYE V9.3 — Canlı Düello ve Spark ligleri
 
 Android WebView oyunu. Çevrim dışı modlar ve V9 ödülleri korunur. Yeni lig istemcisi Cloud Functions kullanmaz: anonim Authentication + Standard Firestore + Hosting ile Spark planına uygundur.
 
 **Canlı durum (16 Ekim 2026):** Spark planında ilk Standard `(default)` Firestore veritabanı `europe-west1` bölgesinde oluşturuldu. V9.2 güvenlik kuralları Firebase Console üzerinden yayımlandı. Gerçek Authentication/Firestore sunucusunda iki bağımsız anonim kullanıcıyla lig kurma, kodla katılma, aynı parkur, skor gönderme, canlı sıralama ve yinelenen gönderim testleri geçti (5900 / 500 puan). Mevcut V9.2 APK bu altyapıyı kullanabilir. Fiziksel iki Android cihaz testi yapılmadı. **Firebase Hosting'deki web sayfası hâlâ V9.1'dir**; Cloud Shell'e erişilemediği ve CLI/WIF dağıtım kimliği bulunmadığı için web sürümü bu işlemde güncellenmedi. V9.2 APK kullanılmalı; eski web sayfası çalışan lig yayını olarak paylaşılmamalı.
+
+## Canlı Düello (V9.3)
+- Ana ekrandaki **2 KİŞİ · CANLI DÜELLO** düğmesiyle iki ayrı cihazdaki oyuncu rakip arar.
+- 32 sabit eşleştirme yuvası, işlem içinde rakip alma ve 3 saniyelik yeniden arama; eşzamanlı gelişler tek maça yakınsar.
+- Sunucu damgalı ortak başlangıç ve 5 saniyelik geri sayım; aynı 12 dalga. Her dalganın sonucu rakibe canlı iletilir.
+- En yüksek puan kazanır, eşitlik beraberliktir. Sonuçlar üç küçük hamle parçasıyla kurallarda doğrulanır; bir oyuncu diğerinin sonucunu yazamaz.
+- 20 saniyede rakip yoksa varsayılan seçenek açıkça etiketli bota geçer; bu seçenek kapatılabilir. Kolay/normal/zor botlar bağımsız ve önceden belirlenen hamleler yapar, oyuncunun skoruna göre hile yapmaz.
+- Botlar çevrimdışı çalışır ve çevrimiçi sıralamaya puan yazmaz. Aramayı iptal etme ile gerçek eşleşme yarışında gerçek eşleşme korunur.
+- Rakip ayrılırsa maç bildirilir; sonuç gelmezse kesinleşmemiş sonuç gösterilir. Ağ kopunca sonuç tekrar gönderilebilir.
+- Aynı ekranda iki kişi modu ayrıca korunur. İki fiziksel Android cihaz testi henüz yapılmadı.
+- Spark ücretsiz kotası geçerlidir. Faturalandırma açılmaz; kota dolarsa çevrimiçi hizmet durabilir. Fonksiyon veya ücretli sunucu gerekmez.
 
 ## Ligler
 - Kodla oluşturma/katılma; oyuncu başına en fazla 5 lig, lig başına 100 oyuncu.
@@ -10,7 +21,7 @@ Android WebView oyunu. Çevrim dışı modlar ve V9 ödülleri korunur. Yeni lig
 - Lig başına günde 20 maç denemesi; yarıda bırakılan maçlar da sayılır.
 - Skor ve hamle eşleşmesi, sahiplik, zaman ve kota güvenlik kurallarında denetlenir.
 - Yinelenen sonuç gönderimi ikinci puan yazmaz. Başkasının skoru değiştirilemez.
-- Bu sistem aynı anda karşılıklı maç değildir; canlı sıralamalı asenkron ligdir.
+- Lig sıralaması asenkrondur; aynı anda karşılıklı oyun ayrı Canlı Düello modundadır.
 - Anonim hesap cihazın WebView/tarayıcı verilerine bağlıdır. Otomatik oynayan araçlara karşı tam koruma sunulmaz.
 
 ## Kontroller

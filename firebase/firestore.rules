@@ -163,6 +163,72 @@ service cloud.firestore {
     && !exists(mp(c,u)) && getAfter(mp(c,u)).data.uid==u;
    allow update,delete: if false;
   }
+  // Public slots contain only aliases and anonymous IDs, never private profiles.
+  function duelRoom(s){return get(/databases/$(database)/documents/duelSlots/$(s)).data;}
+  function duelMember(s,g){let d=duelRoom(s);return signed() && d.status=='matched' && d.generation==g && request.auth.uid in [d.host,d.guest];}
+  function duelResult(s,g,u){return getAfter(/databases/$(database)/documents/duelSlots/$(s)/games/$(g)/players/$(u)).data;}
+  function duelPart(s,g,u,n){return getAfter(/databases/$(database)/documents/duelSlots/$(s)/games/$(g)/players/$(u)/parts/$(n)).data;}
+  function duelRound(d,i,off,r,seed,day){return i+off<r?validPartRound(d.t,d.p,i,seed,day,off):(d.t[2*i]==-1 && d.t[2*i+1]==-1 && d.p[i]==0);}
+  function duelPartValid(d,n,r,seed,day){let off=n=='0'?0:(n=='1'?4:8);
+   return d.t is list && d.t.size()==8 && d.p is list && d.p.size()==4
+    && duelRound(d,0,off,r,seed,day) && duelRound(d,1,off,r,seed,day)
+    && duelRound(d,2,off,r,seed,day) && duelRound(d,3,off,r,seed,day)
+    && d.dead==d.p.hasAny([-1]) && d.sum==d.p[0]+d.p[1]+d.p[2]+d.p[3]
+    && d.good==(d.p[0]>0?1:0)+(d.p[1]>0?1:0)+(d.p[2]>0?1:0)+(d.p[3]>0?1:0);
+  }
+  function duelScore(s,g,u,d){let a=duelPart(s,g,u,'0');let b=duelPart(s,g,u,'1');let c=duelPart(s,g,u,'2');
+   return a.matchId==g && b.matchId==g && c.matchId==g && a.updatedAt==request.time && b.updatedAt==request.time && c.updatedAt==request.time
+    && d.dead==(a.dead||b.dead||c.dead) && d.score==(d.dead?0:a.sum+b.sum+c.sum) && d.good==(d.dead?0:a.good+b.good+c.good);
+  }
+  match /duelSlots/{s} {
+   allow get: if signed();
+   allow list: if signed() && request.query.limit<=32;
+   allow create,update: if signed() && s.matches('^([0-9]|[12][0-9]|3[01])$') && (
+    (request.resource.data.keys().hasAll(['host','hostAlias','guest','guestAlias','status','generation','seed','dayKey','createdAt','joinedAt'])
+     && request.resource.data.keys().hasOnly(['host','hostAlias','guest','guestAlias','status','generation','seed','dayKey','createdAt','joinedAt'])
+     && request.resource.data.host==request.auth.uid && shortName(request.resource.data.hostAlias,18)
+     && request.resource.data.guest=='' && request.resource.data.guestAlias=='' && request.resource.data.status=='waiting'
+     && request.resource.data.generation is string && request.resource.data.generation.matches('^[a-f0-9-]{36}$')
+     && request.resource.data.seed is int && request.resource.data.seed>=1 && request.resource.data.seed<=1000000
+     && request.resource.data.dayKey==today() && request.resource.data.createdAt==request.time && request.resource.data.joinedAt==null
+     && (!exists(/databases/$(database)/documents/duelSlots/$(s)) || resource.data.status=='cancelled' || request.time>resource.data.createdAt+duration.value(120,'s')))
+    || (resource.data.status=='waiting' && resource.data.host!=request.auth.uid
+     && request.time<resource.data.createdAt+duration.value(25,'s') && request.resource.data.status=='matched'
+     && request.resource.data.guest==request.auth.uid && shortName(request.resource.data.guestAlias,18) && request.resource.data.joinedAt==request.time
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest','guestAlias','joinedAt','status']))
+    || (resource.data.host==request.auth.uid && resource.data.status=='waiting' && request.resource.data.status=='cancelled'
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])));
+   allow update: if signed() && resource.data.status=='matched' && request.auth.uid in [resource.data.host,resource.data.guest]
+    && !('leftUid' in resource.data) && request.resource.data.leftUid==request.auth.uid && request.resource.data.leftAt==request.time
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftUid','leftAt']);
+   allow delete: if false;
+   match /games/{g}/players/{u} {
+    allow get: if duelMember(s,g) && u in [duelRoom(s).host,duelRoom(s).guest];
+    allow list: if duelMember(s,g) && request.query.limit<=2;
+    allow create,update: if own(u) && duelMember(s,g)
+     && request.time<duelRoom(s).createdAt+duration.value(120,'s')
+     && request.resource.data.keys().hasAll(['uid','generation','round','score','good','dead','status','updatedAt'])
+     && request.resource.data.keys().hasOnly(['uid','generation','round','score','good','dead','status','updatedAt'])
+     && request.resource.data.uid==u && request.resource.data.generation==g && request.resource.data.updatedAt==request.time
+     && request.resource.data.round is int && request.resource.data.round>=0 && request.resource.data.round<=12
+     && request.resource.data.score is int && request.resource.data.good is int && request.resource.data.dead is bool
+     && request.resource.data.status in ['playing','saved','left']
+     && (request.resource.data.status=='left' || request.resource.data.status==(request.resource.data.round==12||request.resource.data.dead?'saved':'playing'))
+     && request.time>=duelRoom(s).joinedAt+duration.value(5000+request.resource.data.round*1350,'ms')
+     && (!exists(/databases/$(database)/documents/duelSlots/$(s)/games/$(g)/players/$(u)) || (resource.data.status=='playing' && request.resource.data.round>=resource.data.round))
+     && duelScore(s,g,u,request.resource.data);
+    allow delete: if false;
+    match /parts/{n} {
+     allow read,delete: if false;
+     allow create,update: if own(u) && duelMember(s,g) && n in ['0','1','2']
+      && request.resource.data.keys().hasAll(['matchId','t','p','sum','good','dead','updatedAt'])
+      && request.resource.data.keys().hasOnly(['matchId','t','p','sum','good','dead','updatedAt'])
+      && request.resource.data.matchId==g && request.resource.data.updatedAt==request.time
+      && duelResult(s,g,u).updatedAt==request.time
+      && duelPartValid(request.resource.data,n,duelResult(s,g,u).round,duelRoom(s).seed,duelRoom(s).dayKey);
+    }
+   }
+  }
   match /{document=**}{allow read,write: if false;}
  }
 }
