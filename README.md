@@ -2,7 +2,7 @@
 
 Android WebView oyunu. Çevrim dışı modlar ve V9 ödülleri korunur. Yeni lig istemcisi Cloud Functions kullanmaz: anonim Authentication + Standard Firestore + Hosting ile Spark planına uygundur.
 
-**Canlı durum:** Firebase `son-1-saniye-78761` projesinin mevcut Hosting sürümü eski V9.1'dir. 16 Ekim kontrolünde `(default)` Firestore veritabanı yoktu. V9.2'nin kod ve APK hazırlanması, veritabanının ve kuralların yayımlandığı anlamına gelmez. Mevcut çalışma ortamının Firebase oturumu kaybolduğu için canlı dağıtım ve gerçek sunucu testi bekliyor.
+**Canlı durum (16 Ekim 2026):** Spark planında ilk Standard `(default)` Firestore veritabanı `europe-west1` bölgesinde oluşturuldu. V9.2 güvenlik kuralları Firebase Console üzerinden yayımlandı. Gerçek Authentication/Firestore sunucusunda iki bağımsız anonim kullanıcıyla lig kurma, kodla katılma, aynı parkur, skor gönderme, canlı sıralama ve yinelenen gönderim testleri geçti (5900 / 500 puan). Mevcut V9.2 APK bu altyapıyı kullanabilir. Fiziksel iki Android cihaz testi yapılmadı. **Firebase Hosting'deki web sayfası hâlâ V9.1'dir**; Cloud Shell'e erişilemediği ve CLI/WIF dağıtım kimliği bulunmadığı için web sürümü bu işlemde güncellenmedi. V9.2 APK kullanılmalı; eski web sayfası çalışan lig yayını olarak paylaşılmamalı.
 
 ## Ligler
 - Kodla oluşturma/katılma; oyuncu başına en fazla 5 lig, lig başına 100 oyuncu.
