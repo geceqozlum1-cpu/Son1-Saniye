@@ -22,4 +22,4 @@ python3 tests/test_deploy_free.py
 python3 scripts/build_online.py
 ```
 
-Java 21, Node 22 ve Playwright Chromium gerekir. Android APK ve tek dosyalı HTML aynı gömülü istemciyi kullanır. Doğrulama raporu sürümle birlikte kaydedilir. Hamle tutarlılığı doğrulanır; tam otomasyon/anonim hesap çoğaltma önlemi değildir. Güvenlik kuralları test edilmiş prototiptir.
+Java 21, Node 22 ve Playwright Chromium gerekir. Android APK ve tek dosyalı HTML aynı gömülü istemciyi kullanır. [V10 doğrulama raporu](V10_TEST_SONUCLARI.md) gerçek Firebase ve tek HTML canlı testlerini içerir. Hamle tutarlılığı doğrulanır; tam otomasyon/anonim hesap çoğaltma önlemi değildir. Güvenlik kuralları test edilmiş prototiptir.
