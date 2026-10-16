@@ -1,46 +1,25 @@
-# SON 1 SANİYE V9.3 — Canlı Düello ve Spark ligleri
+# SON 1 SANİYE V10 — Canlı Arena
 
-Android WebView oyunu. Çevrim dışı modlar ve V9 ödülleri korunur. Yeni lig istemcisi Cloud Functions kullanmaz: anonim Authentication + Standard Firestore + Hosting ile Spark planına uygundur.
+Karanlık Yağmur odaklı sade ana menü; Oyna / Arkadaşlar / Ligler / Profil.
 
-**Canlı durum (16 Ekim 2026):** Spark planında ilk Standard `(default)` Firestore veritabanı `europe-west1` bölgesinde oluşturuldu. V9.2 güvenlik kuralları Firebase Console üzerinden yayımlandı. Gerçek Authentication/Firestore sunucusunda iki bağımsız anonim kullanıcıyla lig kurma, kodla katılma, aynı parkur, skor gönderme, canlı sıralama ve yinelenen gönderim testleri geçti (5900 / 500 puan). Mevcut V9.2 APK bu altyapıyı kullanabilir. Fiziksel iki Android cihaz testi yapılmadı. **Firebase Hosting'deki web sayfası hâlâ V9.1'dir**; Cloud Shell'e erişilemediği ve CLI/WIF dağıtım kimliği bulunmadığı için web sürümü bu işlemde güncellenmedi. V9.2 APK kullanılmalı; eski web sayfası çalışan lig yayını olarak paylaşılmamalı.
+- Dokuz görünür arena; aynı modda iki cihazla gerçek eşleşme, ortak başlangıç ve 36 hedeflik yarış.
+- Arkadaş kodu, iki taraflı arkadaşlık kabulü ve seçilen arenaya davet.
+- Türkçe isimli, açıkça etiketli kolay/normal/zor botlar; rakip yoksa isteğe bağlı 20 saniyelik geçiş.
+- Bulut profili, 250 XP başına yeni seviye, altı yeni skin; eski koleksiyon korunur.
+- Sayfalı tüm ligler, üye adları/seviyeleri ve doğrulanmış insan düellolarından ligler arası puan yarışı.
+- Tek başına/yerel seçeneklerinde özgün uzun modlar korunur; online sürümler 12 dalgalık rekabet uyarlamalarıdır.
 
-## Canlı Düello (V9.3)
-- Ana ekrandaki **2 KİŞİ · CANLI DÜELLO** düğmesiyle iki ayrı cihazdaki oyuncu rakip arar.
-- 32 sabit eşleştirme yuvası, işlem içinde rakip alma ve 3 saniyelik yeniden arama; eşzamanlı gelişler tek maça yakınsar.
-- Sunucu damgalı ortak başlangıç ve 5 saniyelik geri sayım; aynı 12 dalga. Her dalganın sonucu rakibe canlı iletilir.
-- En yüksek puan kazanır, eşitlik beraberliktir. Sonuçlar üç küçük hamle parçasıyla kurallarda doğrulanır; bir oyuncu diğerinin sonucunu yazamaz.
-- 20 saniyede rakip yoksa varsayılan seçenek açıkça etiketli bota geçer; bu seçenek kapatılabilir. Kolay/normal/zor botlar bağımsız ve önceden belirlenen hamleler yapar, oyuncunun skoruna göre hile yapmaz.
-- Botlar çevrimdışı çalışır ve çevrimiçi sıralamaya puan yazmaz. Aramayı iptal etme ile gerçek eşleşme yarışında gerçek eşleşme korunur.
-- Rakip ayrılırsa maç bildirilir; sonuç gelmezse kesinleşmemiş sonuç gösterilir. Ağ kopunca sonuç tekrar gönderilebilir.
-- Aynı ekranda iki kişi modu ayrıca korunur. İki fiziksel Android cihaz testi henüz yapılmadı.
-- Spark ücretsiz kotası geçerlidir. Faturalandırma açılmaz; kota dolarsa çevrimiçi hizmet durabilir. Fonksiyon veya ücretli sunucu gerekmez.
+Gerçek Firebase: `son-1-saniye-78761`, Standard `(default)` / `europe-west1`, ücretsiz Spark. Cloud Functions veya ücretli plan açılmaz. Eski V9.2/V9.3 lig/düello verisi silinmez. Hosting'deki eski sayfa V10 olarak sunulmaz.
 
-## Ligler
-- Kodla oluşturma/katılma; oyuncu başına en fazla 5 lig, lig başına 100 oyuncu.
-- Aynı UTC gününde aynı 12 dalgalık parkur; bağımsız maçlar ve canlı sıralama.
-- Lig başına günde 20 maç denemesi; yarıda bırakılan maçlar da sayılır.
-- Skor ve hamle eşleşmesi, sahiplik, zaman ve kota güvenlik kurallarında denetlenir.
-- Yinelenen sonuç gönderimi ikinci puan yazmaz. Başkasının skoru değiştirilemez.
-- Lig sıralaması asenkrondur; aynı anda karşılıklı oyun ayrı Canlı Düello modundadır.
-- Anonim hesap cihazın WebView/tarayıcı verilerine bağlıdır. Otomatik oynayan araçlara karşı tam koruma sunulmaz.
+Ayrıntılar ve sınırlar: [V10 oyun rehberi](V10_KURULUM_VE_OYUN_REHBERI.md). Fiziksel iki Android cihaz testi yapılmadı. APK bir debug test derlemesidir; önceki test APK'larının imzalarıyla güncelleme uyumu garanti edilmez. Eski uygulamayı kaldırmak anonim oturumu ve yerel ilerlemeyi kaybettirebilir.
 
-## Kontroller
-`npm ci`, ardından Java ile:
+## Doğrulama
 
 ```sh
-npx -y firebase-tools@latest emulators:exec --only firestore --project demo-son1-free --config firebase/emulator.json "npm test"
+npm ci
+npx -y firebase-tools@latest emulators:exec --only firestore,auth --project demo-son1-free --config firebase/emulator.json "npm test && node tests/browser-v10.cjs"
+python3 tests/test_deploy_free.py
+python3 scripts/build_online.py
 ```
 
-Arayüz testi (Chromium kuruluysa):
-
-```sh
-npx playwright install chromium --only-shell
-npx -y firebase-tools@latest emulators:exec --only firestore,auth --project demo-son1-free --config firebase/emulator.json "node tests/browser-online.cjs"
-```
-
-`python3 scripts/build_online.py` ortak istemciyi tek HTML'ye gömer. Android ve Hosting aynı dosyayı kullanır. APK CI, güvenlik testleri geçmeden derleme yapmaz.
-
-## Ücretsiz dağıtım
-`python3 scripts/deploy_free.py` bağlı hesabı ve `gcloud` gerektirir. Önce faturalandırmanın kapalı olduğunu okur; belirleyemezse değişiklik yapmadan durur. İkinci veritabanı, Enterprise, Functions, faturalandırma bağlantısı veya plan yükseltmesi yapmaz. Sadece tek Standard `(default)` veritabanı, Auth, Firestore kuralları ve Hosting kullanılabilir. Spark kota sınırları dolarsa hizmet durabilir; sınırsız ücretsiz kullanım vaat edilmez.
-
-GitHub `Deploy Spark Free Leagues` iş akışı mevcut WIF kimliğini gerektirir. Kimlik eksikse herhangi bir bulut değişikliği yapmadan durur. Kimlik bilgileri kaynak kodda saklanmaz.
+Java 21, Node 22 ve Playwright Chromium gerekir. Android APK ve tek dosyalı HTML aynı gömülü istemciyi kullanır. Doğrulama raporu sürümle birlikte kaydedilir. Hamle tutarlılığı doğrulanır; tam otomasyon/anonim hesap çoğaltma önlemi değildir. Güvenlik kuralları test edilmiş prototiptir.
