@@ -16,3 +16,9 @@ Gerçek proje: `son-1-saniye-78761`, mevcut Standard `(default)` veritabanı, `e
 ## Sınırlar
 
 İki fiziksel Android cihazla test yapılmadı. APK WebView içinde aynı istemciyi kullanır. Canlı düello için iki cihazda da V9.3 gerekir ve iki oyuncu da rakip arama ekranına girmelidir. Eski Hosting sayfası V9.1 olarak kaldı; yeni özellik APK'dadır. Ücretsiz Firestore kotası dolarsa online hizmet durabilir; otomatik ücretlendirme açılmadı. Hamle tutarlılığı doğrulanır ancak istemci otomasyonu ve anonim hesap çoğaltmaya karşı tam koruma yoktur.
+
+## APK derlemesi ve kurulum sınırı
+
+GitHub Actions çalışması `38865971605`: testler ve APK üretimi başarılı. Commit `f28b77fe354016b92d830d8faa0ce6abf60b59d0`, artifact `12031158119`. APK SHA-256: `77a104150ffca67f1cba7673595fb3d8f9c3f820d7ba829202eaee3a33262bee`. APK içinde V9.3, düello modülleri ve gerçek Firebase proje kimliği doğrulandı.
+
+Bu bir test APK'sıdır. Önceki V9.2 test APK'sı ile V9.3 farklı debug sertifikaları taşır; V9.2 üzerine doğrudan güncelleme kurulamaz. Eski uygulamayı kaldırmak yerel ilerlemeyi ve anonim oturumu kaybettirir. Uygulama otomatik kaldırılmadı ve kullanıcı verisi silinmedi. Fiziksel cihaz kurulumu doğrulanmadı.
