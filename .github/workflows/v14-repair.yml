@@ -1,4 +1,4 @@
-name: V14 Cosmic Android Repair Build
+name: V19.1 Android Kurulum Onarimi
 on:
   push:
     branches: [main]
@@ -7,7 +7,7 @@ on:
       - '.github/workflows/v14-repair.yml'
   workflow_dispatch:
 jobs:
-  android-v14:
+  android-v191:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,15 +27,24 @@ jobs:
           gradle-version: '8.10.2'
       - name: Build with Android Gradle Plugin
         run: gradle --no-daemon :app:assembleDebug
-      - name: Verify install package and signature
+      - name: Verify APK integrity, resources and signature
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"
           unzip -t "$APK"
+          python3 - <<'PY'
+          from zipfile import ZipFile, ZIP_STORED
+          p="app/build/outputs/apk/debug/app-debug.apk"
+          with ZipFile(p) as z:
+              arc=z.getinfo("resources.arsc")
+              assert arc.compress_type == ZIP_STORED, "resources.arsc should not be compressed"
+              assert z.getinfo("assets/index.html").file_size>1000000
+              print("Android resource uncompressed; embedded game HTML present")
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: SON_1_SANIYE_V14_KURULUM_ONARILMIS_APK
+          name: SON_1_SANIYE_V19_1_KURULUM_DUZELTILMIS
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
