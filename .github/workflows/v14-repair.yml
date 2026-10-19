@@ -84,7 +84,14 @@ jobs:
             sleep 8
             adb shell pidof com.sonbirsaniye.son1saniye.v211
             adb shell dumpsys activity activities | grep -F 'com.sonbirsaniye.son1saniye.v211'
-            if adb logcat -d -s AndroidRuntime:E | grep -A 8 -F 'FATAL EXCEPTION' | grep -F 'com.sonbirsaniye.son1saniye.v211'; then
-              echo 'App crash detected'; exit 1
-            fi
+            test -z "$(adb logcat -d -s AndroidRuntime:E | grep -A 8 -F 'FATAL EXCEPTION' | grep -F 'com.sonbirsaniye.son1saniye.v211' || true)"
+            adb shell screencap -p /sdcard/v21-start.png
+            adb pull /sdcard/v21-start.png ./v21-start.png
             echo 'Emulator APK install and launch passed'
+      - name: Upload emulator launch screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SON_1_SANIYE_V21_1_ANDROID_EMULATOR_SCREENSHOT
+          path: ./v21-start.png
+          if-no-files-found: ignore
