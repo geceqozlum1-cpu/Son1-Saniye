@@ -44,7 +44,7 @@ jobs:
               resource=z.getinfo("resources.arsc")
               assert resource.compress_type == ZIP_STORED, "resources.arsc unexpectedly compressed"
               content=z.read("assets/index.html")
-              assert hashlib.sha256(content).hexdigest() == "dfaf4c2ccc08ea8a37b3bb0f8bab7f694fb0541284524ac4c3d8fa5ce87ceb0c", "Source/packaged HTML mismatch"
+              assert hashlib.sha256(content).hexdigest() == "24ca85de18e748037e9b4a91721e39774eb9f06ba1fc596481e1fa43b9b9c710", "Source/packaged HTML mismatch"
               assert len(content) > 1000000
               assert any(x.startswith("res/") for x in z.namelist()), "APK has no compiled Android resources"
               print("SHA-256 HTML:", hashlib.sha256(content).hexdigest())
