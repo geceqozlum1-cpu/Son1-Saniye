@@ -1,4 +1,4 @@
-name: V19.1 Android Kurulum Onarimi
+name: V21.1 Verified Android Package
 on:
   push:
     branches: [main]
@@ -7,7 +7,7 @@ on:
       - '.github/workflows/v14-repair.yml'
   workflow_dispatch:
 jobs:
-  android-v191:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -17,34 +17,74 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Prepare SDK
-        run: |
-          SDKMGR="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
-          test -n "$SDKMGR"
-          "$SDKMGR" "platforms;android-35" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Build with Android Gradle Plugin
-        run: gradle --no-daemon :app:assembleDebug
-      - name: Verify APK integrity, resources and signature
+      - name: Build APK without modifying the ZIP afterwards
+        run: gradle --no-daemon --stacktrace clean :app:assembleDebug
+      - name: Verify Android signatures, alignment, resources, and game assets
+        shell: bash
         run: |
+          set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK"
+          "$BUILD_TOOLS/apksigner" verify --min-sdk-version 26 --verbose --print-certs "$APK" | tee /tmp/apk-signature.txt
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' /tmp/apk-signature.txt
+          "$BUILD_TOOLS/zipalign" -c -v 4 "$APK"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "package: name='com.sonbirsaniye.son1saniye.v211'" /tmp/badging.txt
+          grep -q "launchable-activity: name='com.sonbirsaniye.arcade.MainActivity'" /tmp/badging.txt
           unzip -t "$APK"
           python3 - <<'PY'
           from zipfile import ZipFile, ZIP_STORED
-          p="app/build/outputs/apk/debug/app-debug.apk"
-          with ZipFile(p) as z:
-              arc=z.getinfo("resources.arsc")
-              assert arc.compress_type == ZIP_STORED, "resources.arsc should not be compressed"
-              assert z.getinfo("assets/index.html").file_size>1000000
-              print("Android resource uncompressed; embedded game HTML present")
+          import hashlib
+          f="app/build/outputs/apk/debug/app-debug.apk"
+          with ZipFile(f) as z:
+              resource=z.getinfo("resources.arsc")
+              assert resource.compress_type == ZIP_STORED, "resources.arsc unexpectedly compressed"
+              content=z.read("assets/index.html")
+              assert hashlib.sha256(content).hexdigest() == "bea84158770fc86a74d7aab613667480dfb9a1ffcdf90836f80d4968c20cc285", "Source/packaged HTML mismatch"
+              assert len(content) > 1000000
+              assert z.getinfo("res/drawable-nodpi-v4/son1_v191_launcher.png").file_size > 1000
+              print("SHA-256 HTML:", hashlib.sha256(content).hexdigest())
+              print("Android resources and launcher artwork verified")
           PY
-      - uses: actions/upload-artifact@v4
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v4
         with:
-          name: SON_1_SANIYE_V19_1_KURULUM_DUZELTILMIS
+          name: SON_1_SANIYE_V21_1_STANDART_IMZALI_APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+  emulator-install:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: SON_1_SANIYE_V21_1_STANDART_IMZALI_APK
+          path: ./verified-apk
+      - name: Allow KVM
+        run: |
+          if test -e /dev/kvm; then sudo chmod 666 /dev/kvm; fi
+      - name: Install and launch on real Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            set -eux
+            adb install -r verified-apk/app-debug.apk
+            adb shell am start -W -n com.sonbirsaniye.son1saniye.v211/com.sonbirsaniye.arcade.MainActivity
+            sleep 8
+            adb shell pidof com.sonbirsaniye.son1saniye.v211
+            adb shell dumpsys activity activities | grep -F 'com.sonbirsaniye.son1saniye.v211'
+            if adb logcat -d -s AndroidRuntime:E | grep -A 8 -F 'FATAL EXCEPTION' | grep -F 'com.sonbirsaniye.son1saniye.v211'; then
+              echo 'App crash detected'; exit 1
+            fi
+            echo 'Emulator APK install and launch passed'
