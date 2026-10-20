@@ -1,0 +1,50 @@
+name: VOL28 Android WebView DOM Recheck
+on:
+  push:
+    branches: [vol28-webview-probe-2]
+    paths: ['.github/workflows/vol28-android-probe-2.yml','app/**']
+  workflow_dispatch:
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Build diagnostic debug APK
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Allow KVM
+        run: |
+          if test -e /dev/kvm; then sudo chmod 666 /dev/kvm; fi
+      - name: Emulator inspect and log JS exceptions
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          profile: pixel_2
+          emulator-boot-timeout: 900
+          script: |
+            adb logcat -c
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -W -n com.sonbirsaniye.son1saniye.v26/com.sonbirsaniye.arcade.MainActivity
+            sleep 10
+            adb logcat -d -s SON1_JS:E SON1_DOM:I AndroidRuntime:E > webview_log.txt
+            cat webview_log.txt
+            adb shell screencap -p /sdcard/vol28-probe.png
+            adb pull /sdcard/vol28-probe.png ./vol28-probe.png
+            adb shell pidof com.sonbirsaniye.son1saniye.v26
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: VOL28_DEBUG_WEBVIEW_CONSOLE_AND_SCREENSHOT
+          path: |
+            ./webview_log.txt
+            ./vol28-probe.png
+          if-no-files-found: warn
