@@ -398,6 +398,88 @@ service cloud.firestore {
     }
    }
   }
+
+  // VOL31: unranked player-vs-player match rooms. No leaderboard or XP writes.
+  function v30Modes(m) { return m in ['classic','rise','fall','endless','sync']; }
+  function v30Slot(id,m) {
+    return id.matches('^(classic|rise|fall|endless|sync)-([0-9]|[1-5][0-9]|6[0-3])
+ }
+}
+)
+      && id.matches('^' + m + '-.*
+ }
+}
+);
+  }
+  function v30Course(o) {
+    return o is map && o.keys().hasAll(['rounds','level','black']) && o.keys().hasOnly(['rounds','level','black'])
+      && o.rounds is int && o.rounds>=1 && o.rounds<=25 && o.level is int && o.level<=10 && o.level>=1 && o.black is bool;
+  }
+  function v30New(id,d) {
+    return request.auth != null
+      && d.keys().hasAll(['mode','targetUid','host','hostAlias','guest','guestAlias','status','generation','seed','dayKey','courseOptions','createdAt','joinedAt'])
+      && d.keys().hasOnly(['mode','targetUid','host','hostAlias','guest','guestAlias','status','generation','seed','dayKey','courseOptions','createdAt','joinedAt'])
+      && v30Modes(d.mode) && v30Slot(id,d.mode)
+      && d.targetUid is string && d.targetUid.size()<=128 && d.targetUid!=request.auth.uid
+      && d.host==request.auth.uid && d.hostAlias is string && d.hostAlias.size()>0 && d.hostAlias.size()<=18
+      && d.guest=='' && d.guestAlias=='' && d.status=='waiting'
+      && d.generation is string && d.generation.matches('^[a-f0-9-]{36}
+ }
+}
+)
+      && d.seed is int && d.seed>=1 && d.seed<=1000000
+      && d.dayKey is int && d.dayKey>=19000 && d.dayKey<=27000
+      && v30Course(d.courseOptions) && d.createdAt==request.time && d.joinedAt==null;
+  }
+  function v30GameRoom(id) { return get(/databases/$(database)/documents/arenaV30Rooms/$(id)).data; }
+  match /arenaV30Rooms/{id} {
+    allow get: if request.auth != null;
+    allow list: if request.auth != null && request.query.limit != null && request.query.limit<=64;
+    allow create: if v30New(id,request.resource.data);
+    allow update: if
+      ((resource.data.status=='cancelled' || request.time>resource.data.createdAt+duration.value(900,'s'))
+        && v30New(id,request.resource.data))
+      || (request.auth!=null && resource.data.status=='waiting' && request.auth.uid!=resource.data.host
+        && request.time<=resource.data.createdAt+duration.value(20,'s')
+        && (resource.data.targetUid=='' || resource.data.targetUid==request.auth.uid)
+        && request.resource.data.status=='matched' && request.resource.data.guest==request.auth.uid
+        && request.resource.data.guestAlias is string && request.resource.data.guestAlias.size()>0
+        && request.resource.data.guestAlias.size()<=18 && request.resource.data.joinedAt==request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','guest','guestAlias','joinedAt']))
+      || (request.auth!=null && resource.data.status=='waiting' && resource.data.host==request.auth.uid
+        && request.resource.data.status=='cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+      || (request.auth!=null && resource.data.status=='matched'
+        && request.auth.uid in [resource.data.host,resource.data.guest]
+        && !('leftUid' in resource.data) && request.resource.data.leftUid==request.auth.uid
+        && request.resource.data.leftAt==request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftUid','leftAt']));
+    allow delete: if false;
+    match /games/{generation}/players/{uid} {
+      allow get, list: if request.auth!=null
+        && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
+        && v30GameRoom(id).generation==generation
+        && request.auth.uid in [v30GameRoom(id).host,v30GameRoom(id).guest]
+        && (request.query.limit==null || request.query.limit<=2);
+      allow create: if request.auth!=null && request.auth.uid==uid
+        && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
+        && v30GameRoom(id).generation==generation
+        && v30GameRoom(id).status=='matched'
+        && uid in [v30GameRoom(id).host,v30GameRoom(id).guest]
+        && request.resource.data.keys().hasAll(['uid','generation','events','score','good','dead','status','finishedAt'])
+        && request.resource.data.keys().hasOnly(['uid','generation','events','score','good','dead','status','finishedAt'])
+        && request.resource.data.uid==uid && request.resource.data.generation==generation
+        && request.resource.data.events is list && request.resource.data.events.size()<=1000
+        && request.resource.data.score is int && request.resource.data.score>=0 && request.resource.data.score<=10000000
+        && request.resource.data.good is int && request.resource.data.good>=0 && request.resource.data.good<=2000
+        && request.resource.data.dead is bool && request.resource.data.status=='saved'
+        && request.resource.data.finishedAt==request.time
+        && request.time>v30GameRoom(id).joinedAt+duration.value(5,'s')
+        && request.time<v30GameRoom(id).joinedAt+duration.value(900,'s');
+      allow update, delete: if false;
+    }
+  }
+
   match /{document=**}{allow read,write: if false;}
  }
 }
