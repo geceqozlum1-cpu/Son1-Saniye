@@ -1,0 +1,403 @@
+rules_version = '2';
+// Spark-only league schema. No Functions are used and no client can edit another member.
+// freeLeagues: invite-code metadata; members: public aliases and bounded scores;
+// tickets: one private active match per member; freeProfiles: private membership quota.
+// Limits: 5 memberships/account, 100 members/league, 20 attempts/member/UTC day.
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signed(){return request.auth != null;}
+  function own(uid){return signed() && request.auth.uid == uid;}
+  function validCode(code){return code is string && code.matches('^[A-HJ-NP-Z2-9]{7}$');}
+  function lp(c){return /databases/$(database)/documents/freeLeagues/$(c);}
+  function mp(c,u){return /databases/$(database)/documents/freeLeagues/$(c)/members/$(u);}
+  function tp(c,u){return /databases/$(database)/documents/freeLeagues/$(c)/tickets/$(u);}
+  function pp(u){return /databases/$(database)/documents/freeProfiles/$(u);}
+  function ip(c,u){return /databases/$(database)/documents/profiles/$(u)/freeLeagues/$(c);}
+  function member(c){return signed() && exists(mp(c,request.auth.uid));}
+  function today(){return int(request.time.toMillis() / 86400000);}
+  function shortName(s,n){return s is string && s.size()>0 && s.size()<=n;}
+  function memberShape(d,u){
+   return d.keys().hasAll(['uid','alias','best','total','played','dayKey','lastMatch','joinedAt','updatedAt'])
+    && d.keys().hasOnly(['uid','alias','best','total','played','dayKey','lastMatch','joinedAt','updatedAt'])
+    && d.uid==u && shortName(d.alias,18) && d.best is int && d.best>=0 && d.best<=8400
+    && d.total is int && d.total>=0 && d.total<=168000 && d.played is int && d.played>=0 && d.played<=20
+    && d.dayKey is int && d.dayKey>=-1 && d.dayKey<=today() && d.lastMatch is string && d.lastMatch.size()<=36
+    && d.joinedAt is timestamp && d.updatedAt==request.time;
+  }
+  function sameMember(d,o){return d.uid==o.uid && d.alias==o.alias && d.joinedAt==o.joinedAt;}
+  function startMember(c,u,d,o){
+   let t=getAfter(tp(c,u)).data;
+   return t.status=='playing' && t.startedAt==request.time && d.lastMatch==t.matchId
+    && d.dayKey==today() && d.played==(o.dayKey==today()?o.played+1:1)
+    && d.best==(o.dayKey==today()?o.best:0) && d.total==(o.dayKey==today()?o.total:0);
+  }
+  function finishMember(c,u,d,o){
+   let before=get(tp(c,u)).data;
+   let after=getAfter(tp(c,u)).data;
+   return before.status=='playing' && after.status=='saved' && after.completedAt==request.time
+    && after.matchId==o.lastMatch && d.lastMatch==o.lastMatch && d.dayKey==o.dayKey && d.played==o.played
+    && d.best==(o.best>after.score?o.best:after.score) && d.total==o.total+after.score;
+  }
+  function color(seed,day,i){let r=(seed*17+day*31+i*43+i*i*7)%101;return i==0?0:(r<45?0:(r<70?1:(r<89?2:3)));}
+  function validPartRound(t,p,i,seed,day,off){
+   let a=t[2*i];let b=t[2*i+1];let v=p[i];let c=color(seed,day,i+off);
+   return a is int && b is int && v is int && a>=-1 && a<=950 && b>=-1 && b<=950
+    && (b==-1 || (a>=0 && b>=a))
+    && v==(c==0?(a>=0 && b==-1?500:0):(c==1?(a>=0 && b-a>=75 && b-a<=480?700:0):(c==2?(a==-1?250:0):(a==-1?400:-1))));
+  }
+  function validPart(d,seed,day,n){
+   let off=n=='0'?0:(n=='1'?4:8);
+   return d.t is list && d.t.size()==8 && d.p is list && d.p.size()==4
+    && validPartRound(d.t,d.p,0,seed,day,off) && validPartRound(d.t,d.p,1,seed,day,off)
+    && validPartRound(d.t,d.p,2,seed,day,off) && validPartRound(d.t,d.p,3,seed,day,off)
+    && d.dead==d.p.hasAny([-1]) && d.sum==d.p[0]+d.p[1]+d.p[2]+d.p[3]
+    && d.good==(d.p[0]>0?1:0)+(d.p[1]>0?1:0)+(d.p[2]>0?1:0)+(d.p[3]>0?1:0);
+  }
+  function part(c,u,n){return getAfter(/databases/$(database)/documents/freeLeagues/$(c)/tickets/$(u)/parts/$(n)).data;}
+  function validScore(c,u,d){
+   let a=part(c,u,'0');let b=part(c,u,'1');let cpart=part(c,u,'2');
+   return a.matchId==d.matchId && b.matchId==d.matchId && cpart.matchId==d.matchId
+    && a.updatedAt==request.time && b.updatedAt==request.time && cpart.updatedAt==request.time
+    && d.dead==(a.dead || b.dead || cpart.dead)
+    && d.score==(d.dead?0:a.sum+b.sum+cpart.sum) && d.good==(d.dead?0:a.good+b.good+cpart.good);
+  }
+  function ticketStart(c,u,d){
+   let before=get(mp(c,u)).data;let after=getAfter(mp(c,u)).data;
+   return d.keys().hasAll(['uid','matchId','status','startedAt','dayKey'])
+    && d.keys().hasOnly(['uid','matchId','status','startedAt','dayKey'])
+    && d.uid==u && d.matchId is string && d.matchId.matches('^[a-f0-9-]{36}$')
+    && d.status=='playing' && d.startedAt==request.time && d.dayKey==today()
+    && after.lastMatch==d.matchId && after.updatedAt==request.time
+    && after.played==(before.dayKey==today()?before.played+1:1) && after.played<=20;
+  }
+  function ticketSave(c,u,d,o){
+   let m=getAfter(mp(c,u)).data;
+   return d.keys().hasAll(['uid','matchId','status','startedAt','dayKey','completedAt','score','good','dead'])
+    && d.keys().hasOnly(['uid','matchId','status','startedAt','dayKey','completedAt','score','good','dead'])
+    && d.uid==o.uid && d.matchId==o.matchId && d.startedAt==o.startedAt && d.dayKey==o.dayKey
+    && o.status=='playing' && d.status=='saved' && d.completedAt==request.time && d.dayKey==today()
+    && request.time>=o.startedAt && request.time<=o.startedAt+duration.value(240,'s')
+    && d.score is int && d.good is int && d.dead is bool
+    && (d.dead || request.time>=o.startedAt+duration.value(16200,'ms'))
+    && validScore(c,u,d)
+    && m.lastMatch==o.matchId && m.updatedAt==request.time;
+  }
+  match /freeLeagues/{c} {
+   // Invite metadata contains no email, tokens, roster or private profile data.
+   allow get: if signed() && validCode(c);
+   allow list: if signed() && request.query.limit<=20;
+   allow create: if signed() && validCode(c)
+    && request.resource.data.keys().hasAll(['name','code','ownerUid','memberCount','seed','createdAt'])
+    && request.resource.data.keys().hasOnly(['name','code','ownerUid','memberCount','seed','createdAt'])
+    && shortName(request.resource.data.name,30) && request.resource.data.name.size()>=3
+    && request.resource.data.code==c && request.resource.data.ownerUid==request.auth.uid
+    && request.resource.data.memberCount==1 && request.resource.data.seed is int
+    && request.resource.data.seed>=1 && request.resource.data.seed<=1000000
+    && request.resource.data.createdAt==request.time
+    && getAfter(mp(c,request.auth.uid)).data.uid==request.auth.uid
+    && getAfter(ip(c,request.auth.uid)).data.leagueId==c;
+   allow update: if signed() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount'])
+    && request.resource.data.memberCount==resource.data.memberCount+1 && request.resource.data.memberCount<=100
+    && !exists(mp(c,request.auth.uid)) && getAfter(mp(c,request.auth.uid)).data.uid==request.auth.uid
+    && getAfter(ip(c,request.auth.uid)).data.leagueId==c;
+   allow delete: if false;
+   match /members/{u} {
+    allow get: if own(u) || member(c);
+    allow list: if member(c) && request.query.limit<=100;
+    allow create: if own(u) && validCode(c) && memberShape(request.resource.data,u)
+     && request.resource.data.best==0 && request.resource.data.total==0 && request.resource.data.played==0
+     && request.resource.data.dayKey==-1 && request.resource.data.lastMatch=='' && request.resource.data.joinedAt==request.time
+     && getAfter(lp(c)).data.memberCount==(exists(lp(c))?get(lp(c)).data.memberCount+1:1)
+     && getAfter(ip(c,u)).data.leagueId==c && getAfter(pp(u)).data.lastLeague==c
+     && getAfter(pp(u)).data.updatedAt==request.time;
+    allow update: if own(u) && exists(lp(c)) && memberShape(request.resource.data,u)
+     && sameMember(request.resource.data,resource.data)
+     && (startMember(c,u,request.resource.data,resource.data) || finishMember(c,u,request.resource.data,resource.data));
+    allow delete: if false;
+   }
+   match /tickets/{u} {
+    allow get: if own(u);
+    match /parts/{n} {
+     allow get: if own(u);
+     allow list,delete: if false;
+     allow create,update: if own(u) && n in ['0','1','2']
+      && request.resource.data.keys().hasAll(['matchId','t','p','sum','good','dead','updatedAt'])
+      && request.resource.data.keys().hasOnly(['matchId','t','p','sum','good','dead','updatedAt'])
+      && request.resource.data.matchId==get(tp(c,u)).data.matchId && get(tp(c,u)).data.status=='playing'
+      && getAfter(tp(c,u)).data.status=='saved' && getAfter(tp(c,u)).data.completedAt==request.time
+      && request.resource.data.updatedAt==request.time
+      && validPart(request.resource.data,get(lp(c)).data.seed,get(tp(c,u)).data.dayKey,n);
+    }
+    allow list,delete: if false;
+    allow create: if own(u) && member(c) && ticketStart(c,u,request.resource.data);
+    allow update: if own(u) && member(c) && (
+     (ticketStart(c,u,request.resource.data) && request.resource.data.matchId!=resource.data.matchId
+      && (resource.data.status!='playing' || resource.data.dayKey!=today() || request.time>resource.data.startedAt+duration.value(240,'s')))
+     || ticketSave(c,u,request.resource.data,resource.data)
+     || (resource.data.status=='playing' && request.resource.data.status=='aborted'
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completedAt'])
+      && request.resource.data.completedAt==request.time));
+   }
+  }
+  match /freeProfiles/{u} {
+   allow get: if own(u);
+   allow list,delete: if false;
+   allow create,update: if own(u)
+    && request.resource.data.keys().hasAll(['count','lastLeague','updatedAt'])
+    && request.resource.data.keys().hasOnly(['count','lastLeague','updatedAt'])
+    && request.resource.data.count is int && request.resource.data.count>=1 && request.resource.data.count<=5
+    && request.resource.data.count==(exists(pp(u))?resource.data.count+1:1)
+    && validCode(request.resource.data.lastLeague) && request.resource.data.updatedAt==request.time
+    && !exists(mp(request.resource.data.lastLeague,u))
+    && getAfter(mp(request.resource.data.lastLeague,u)).data.uid==u
+    && getAfter(ip(request.resource.data.lastLeague,u)).data.leagueId==request.resource.data.lastLeague;
+  }
+  match /profiles/{u}/freeLeagues/{c} {
+   allow get: if own(u);
+   allow list: if own(u) && request.query.limit<=5;
+   allow create: if own(u) && validCode(c)
+    && request.resource.data.keys().hasAll(['leagueId','code','name','joinedAt'])
+    && request.resource.data.keys().hasOnly(['leagueId','code','name','joinedAt'])
+    && request.resource.data.leagueId==c && request.resource.data.code==c
+    && request.resource.data.name==getAfter(lp(c)).data.name && request.resource.data.joinedAt==request.time
+    && !exists(mp(c,u)) && getAfter(mp(c,u)).data.uid==u;
+   allow update,delete: if false;
+  }
+  // Public slots contain only aliases and anonymous IDs, never private profiles.
+  function duelRoom(s){return get(/databases/$(database)/documents/duelSlots/$(s)).data;}
+  function duelMember(s,g){let d=duelRoom(s);return signed() && d.status=='matched' && d.generation==g && request.auth.uid in [d.host,d.guest];}
+  function duelResult(s,g,u){return getAfter(/databases/$(database)/documents/duelSlots/$(s)/games/$(g)/players/$(u)).data;}
+  function duelPart(s,g,u,n){return getAfter(/databases/$(database)/documents/duelSlots/$(s)/games/$(g)/players/$(u)/parts/$(n)).data;}
+  function duelRound(d,i,off,r,seed,day){return i+off<r?validPartRound(d.t,d.p,i,seed,day,off):(d.t[2*i]==-1 && d.t[2*i+1]==-1 && d.p[i]==0);}
+  function duelPartValid(d,n,r,seed,day){let off=n=='0'?0:(n=='1'?4:8);
+   return d.t is list && d.t.size()==8 && d.p is list && d.p.size()==4
+    && duelRound(d,0,off,r,seed,day) && duelRound(d,1,off,r,seed,day)
+    && duelRound(d,2,off,r,seed,day) && duelRound(d,3,off,r,seed,day)
+    && d.dead==d.p.hasAny([-1]) && d.sum==d.p[0]+d.p[1]+d.p[2]+d.p[3]
+    && d.good==(d.p[0]>0?1:0)+(d.p[1]>0?1:0)+(d.p[2]>0?1:0)+(d.p[3]>0?1:0);
+  }
+  function duelScore(s,g,u,d){let a=duelPart(s,g,u,'0');let b=duelPart(s,g,u,'1');let c=duelPart(s,g,u,'2');
+   return a.matchId==g && b.matchId==g && c.matchId==g && a.updatedAt==request.time && b.updatedAt==request.time && c.updatedAt==request.time
+    && d.dead==(a.dead||b.dead||c.dead) && d.score==(d.dead?0:a.sum+b.sum+c.sum) && d.good==(d.dead?0:a.good+b.good+c.good);
+  }
+  match /duelSlots/{s} {
+   allow get: if signed();
+   allow list: if signed() && request.query.limit<=32;
+   allow create,update: if signed() && s.matches('^([0-9]|[12][0-9]|3[01])$') && (
+    (request.resource.data.keys().hasAll(['host','hostAlias','guest','guestAlias','status','generation','seed','dayKey','createdAt','joinedAt'])
+     && request.resource.data.keys().hasOnly(['host','hostAlias','guest','guestAlias','status','generation','seed','dayKey','createdAt','joinedAt'])
+     && request.resource.data.host==request.auth.uid && shortName(request.resource.data.hostAlias,18)
+     && request.resource.data.guest=='' && request.resource.data.guestAlias=='' && request.resource.data.status=='waiting'
+     && request.resource.data.generation is string && request.resource.data.generation.matches('^[a-f0-9-]{36}$')
+     && request.resource.data.seed is int && request.resource.data.seed>=1 && request.resource.data.seed<=1000000
+     && request.resource.data.dayKey==today() && request.resource.data.createdAt==request.time && request.resource.data.joinedAt==null
+     && (!exists(/databases/$(database)/documents/duelSlots/$(s)) || resource.data.status=='cancelled' || request.time>resource.data.createdAt+duration.value(120,'s')))
+    || (resource.data.status=='waiting' && resource.data.host!=request.auth.uid
+     && request.time<resource.data.createdAt+duration.value(25,'s') && request.resource.data.status=='matched'
+     && request.resource.data.guest==request.auth.uid && shortName(request.resource.data.guestAlias,18) && request.resource.data.joinedAt==request.time
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest','guestAlias','joinedAt','status']))
+    || (resource.data.host==request.auth.uid && resource.data.status=='waiting' && request.resource.data.status=='cancelled'
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])));
+   allow update: if signed() && resource.data.status=='matched' && request.auth.uid in [resource.data.host,resource.data.guest]
+    && !('leftUid' in resource.data) && request.resource.data.leftUid==request.auth.uid && request.resource.data.leftAt==request.time
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftUid','leftAt']);
+   allow delete: if false;
+   match /games/{g}/players/{u} {
+    allow get: if duelMember(s,g) && u in [duelRoom(s).host,duelRoom(s).guest];
+    allow list: if duelMember(s,g) && request.query.limit<=2;
+    allow create,update: if own(u) && duelMember(s,g)
+     && request.time<duelRoom(s).createdAt+duration.value(120,'s')
+     && request.resource.data.keys().hasAll(['uid','generation','round','score','good','dead','status','updatedAt'])
+     && request.resource.data.keys().hasOnly(['uid','generation','round','score','good','dead','status','updatedAt'])
+     && request.resource.data.uid==u && request.resource.data.generation==g && request.resource.data.updatedAt==request.time
+     && request.resource.data.round is int && request.resource.data.round>=0 && request.resource.data.round<=12
+     && request.resource.data.score is int && request.resource.data.good is int && request.resource.data.dead is bool
+     && request.resource.data.status in ['playing','saved','left']
+     && (request.resource.data.status=='left' || request.resource.data.status==(request.resource.data.round==12||request.resource.data.dead?'saved':'playing'))
+     && request.time>=duelRoom(s).joinedAt+duration.value(5000+request.resource.data.round*1350,'ms')
+     && (!exists(/databases/$(database)/documents/duelSlots/$(s)/games/$(g)/players/$(u)) || (resource.data.status=='playing' && request.resource.data.round>=resource.data.round))
+     && duelScore(s,g,u,request.resource.data);
+    allow delete: if false;
+    match /parts/{n} {
+     allow read,delete: if false;
+     allow create,update: if own(u) && duelMember(s,g) && n in ['0','1','2']
+      && request.resource.data.keys().hasAll(['matchId','t','p','sum','good','dead','updatedAt'])
+      && request.resource.data.keys().hasOnly(['matchId','t','p','sum','good','dead','updatedAt'])
+      && request.resource.data.matchId==g && request.resource.data.updatedAt==request.time
+      && duelResult(s,g,u).updatedAt==request.time
+      && duelPartValid(request.resource.data,n,duelResult(s,g,u).round,duelRoom(s).seed,duelRoom(s).dayKey);
+    }
+   }
+  }
+  // V10 public game profiles contain aliases, cosmetic IDs and game stats only.
+  function sp(u){return /databases/$(database)/documents/socialProfiles/$(u);}
+  function fr(u,v){return /databases/$(database)/documents/socialProfiles/$(u)/friends/$(v);}
+  function rp(u,k){return /databases/$(database)/documents/socialProfiles/$(u)/receipts/$(k);}
+  function ar(s){return /databases/$(database)/documents/arenaSlots/$(s);}
+  function ap(s,g,u){return /databases/$(database)/documents/arenaSlots/$(s)/games/$(g)/players/$(u);}
+  function mode(m){return m in ['fall','classic','rise','sync','daily','endless','challenge','course','party'];}
+  function modeSeed(s,m){return s+(m=='fall'?0:m=='classic'?101:m=='rise'?202:m=='sync'?303:m=='daily'?404:m=='endless'?505:m=='challenge'?606:m=='course'?707:808);}
+  function skinOk(s,xp){return s=='mint'||s=='ice'&&xp>=500||s=='violet'&&xp>=1000||s=='sun'&&xp>=2250||s=='rose'&&xp>=4750||s=='royal'&&xp>=9750;}
+  function profileShape(d,u){return d.keys().hasAll(['uid','code','alias','xp','matches','wins','skin','createdAt','lastSeen','lastReceipt'])
+   && d.keys().hasOnly(['uid','code','alias','xp','matches','wins','skin','createdAt','lastSeen','lastReceipt']) && d.uid==u
+   && d.code is string && d.code.matches('^[A-HJ-NP-Z2-9]{8}$') && shortName(d.alias,18)
+   && d.xp is int && d.xp>=0 && d.xp<=2147483647 && d.matches is int && d.matches>=0 && d.matches<=10000000
+   && d.wins is int && d.wins>=0 && d.wins<=d.matches && skinOk(d.skin,d.xp)
+   && d.createdAt is timestamp && d.lastSeen==request.time && d.lastReceipt is string && d.lastReceipt.size()<=36;}
+  function earnProfile(d,o,u){let r=getAfter(rp(u,d.lastReceipt)).data;
+   return !exists(rp(u,d.lastReceipt)) && r.createdAt==request.time && d.xp==o.xp+r.xp && d.matches==o.matches+1 && d.wins==o.wins+(r.win?1:0);}
+  match /socialProfiles/{u} {
+   allow get: if signed();
+   allow list,delete: if false;
+   allow create: if own(u) && profileShape(request.resource.data,u) && request.resource.data.xp==0 && request.resource.data.matches==0
+    && request.resource.data.wins==0 && request.resource.data.lastReceipt=='' && request.resource.data.createdAt==request.time
+    && getAfter(/databases/$(database)/documents/playerCodes/$(request.resource.data.code)).data.uid==u;
+   allow update: if own(u) && profileShape(request.resource.data,u) && request.resource.data.code==resource.data.code && request.resource.data.createdAt==resource.data.createdAt
+    && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['alias','skin','lastSeen']))
+     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['xp','matches','wins','lastReceipt','lastSeen']) && earnProfile(request.resource.data,resource.data,u)));
+   match /friends/{v} {
+    allow get: if signed() && request.auth.uid in [u,v];
+    allow list: if own(u) && request.query.limit<=50;
+    allow create: if signed() && u!=v && request.resource.data.keys().hasAll(['from','to','status','createdAt','updatedAt'])
+     && request.resource.data.keys().hasOnly(['from','to','status','createdAt','updatedAt']) && request.resource.data.from==request.auth.uid
+     && request.resource.data.from in [u,v] && request.resource.data.to in [u,v] && request.resource.data.from!=request.resource.data.to
+     && exists(sp(u)) && exists(sp(v)) && request.resource.data.status=='pending' && request.resource.data.createdAt==request.time && request.resource.data.updatedAt==request.time
+     && !exists(fr(v,u)) && getAfter(fr(v,u)).data==request.resource.data;
+    allow update: if signed() && request.auth.uid==resource.data.to && resource.data.status=='pending'
+     && request.resource.data.status in ['accepted','declined'] && request.resource.data.updatedAt==request.time
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt']) && getAfter(fr(v,u)).data==request.resource.data;
+    allow delete: if false;
+   }
+   match /invites/{v} {
+    allow get: if own(u)||own(v);
+    allow list: if own(u) && request.query.limit<=20;
+    allow create,update: if own(v) && get(fr(u,v)).data.status=='accepted'
+     && request.resource.data.keys().hasAll(['from','to','mode','createdAt']) && request.resource.data.keys().hasOnly(['from','to','mode','createdAt'])
+     && request.resource.data.from==v && request.resource.data.to==u && mode(request.resource.data.mode) && request.resource.data.createdAt==request.time;
+    allow delete: if own(u);
+   }
+   match /receipts/{k} {
+    allow get: if own(u);
+    allow list,update,delete: if false;
+    allow create: if own(u) && k.matches('^[a-f0-9-]{36}$') && receiptShape(request.resource.data,u,k)
+     && getAfter(sp(u)).data.lastReceipt==k && getAfter(sp(u)).data.lastSeen==request.time
+     && (request.resource.data.kind=='arena'?arenaReceipt(request.resource.data,u):trainingReceipt(request.resource.data,u));
+   }
+  }
+  match /playerCodes/{c} {
+   allow get: if signed();
+   allow list,update,delete: if false;
+   allow create: if signed() && c.matches('^[A-HJ-NP-Z2-9]{8}$') && request.resource.data.keys().hasAll(['uid','createdAt'])
+    && request.resource.data.keys().hasOnly(['uid','createdAt']) && request.resource.data.uid==request.auth.uid && request.resource.data.createdAt==request.time
+    && !exists(sp(request.auth.uid)) && getAfter(sp(request.auth.uid)).data.code==c;
+  }
+  function receiptShape(d,u,k){return d.keys().hasAll(['kind','uid','roomId','generation','xp','win','points','leagueId','createdAt'])
+   && d.keys().hasOnly(['kind','uid','roomId','generation','xp','win','points','leagueId','createdAt']) && d.uid==u && d.generation==k
+   && d.kind in ['arena','training'] && d.xp is int && d.xp>=50 && d.xp<=402 && d.win is bool && d.points is int && d.points>=0 && d.points<=25200
+   && d.roomId is string && d.roomId.size()<=16 && d.leagueId is string && (d.leagueId==''||validCode(d.leagueId)) && d.createdAt==request.time;}
+  function arenaReceipt(d,u){let room=get(ar(d.roomId)).data;let a=get(ap(d.roomId,d.generation,u)).data;let b=get(ap(d.roomId,d.generation,room.host==u?room.guest:room.host)).data;
+   return room.generation==d.generation && u in [room.host,room.guest] && a.status=='saved' && b.status=='saved'
+    && d.points==a.score && d.win==(a.score>b.score) && d.xp==50+int(a.score / 100)+(d.win?100:0)
+    && (d.leagueId=='' || (exists(mp(d.leagueId,u)) && getAfter(/databases/$(database)/documents/leagueBattle/$(d.leagueId)).data.lastReceipt==d.generation));}
+  function trainingReceipt(d,u){let t=getAfter(/databases/$(database)/documents/trainingRuns/$(u)).data;
+   return t.matchId==d.generation && t.status=='saved' && t.completedAt==request.time && d.roomId=='' && d.leagueId=='' && d.points==0 && d.xp==50 && d.win==false;}
+  match /trainingRuns/{u} {
+   allow get: if own(u);
+   allow list,delete: if false;
+   allow create,update: if own(u) && request.resource.data.keys().hasAll(['uid','matchId','status','dayKey','played','startedAt'])
+    && request.resource.data.keys().hasOnly(['uid','matchId','status','dayKey','played','startedAt']) && request.resource.data.uid==u
+    && request.resource.data.matchId is string && request.resource.data.matchId.matches('^[a-f0-9-]{36}$') && request.resource.data.status=='playing'
+    && request.resource.data.dayKey==today() && request.resource.data.played is int && request.resource.data.played>=1 && request.resource.data.played<=20
+    && request.resource.data.startedAt==request.time
+    && (!exists(/databases/$(database)/documents/trainingRuns/$(u))?request.resource.data.played==1:
+     (request.resource.data.played==(resource.data.dayKey==today()?resource.data.played+1:1) && (resource.data.status=='saved'||request.time>resource.data.startedAt+duration.value(3600,'s'))));
+   allow update: if own(u) && resource.data.status=='playing' && request.resource.data.status=='saved'
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completedAt']) && request.resource.data.completedAt==request.time
+    && request.time>=resource.data.startedAt+duration.value(17400,'ms') && request.time<=resource.data.startedAt+duration.value(3600,'s')
+    && getAfter(rp(u,resource.data.matchId)).data.createdAt==request.time;
+  }
+  match /leagueBattle/{c} {
+   allow get: if signed();allow list: if signed() && request.query.limit<=20;allow delete: if false;
+   allow create,update: if signed() && validCode(c) && member(c)
+    && request.resource.data.keys().hasAll(['code','name','points','matches','lastUid','lastReceipt','updatedAt'])
+    && request.resource.data.keys().hasOnly(['code','name','points','matches','lastUid','lastReceipt','updatedAt'])
+    && request.resource.data.code==c && request.resource.data.name==get(lp(c)).data.name && request.resource.data.lastUid==request.auth.uid
+    && request.resource.data.lastReceipt is string && request.resource.data.lastReceipt.size()==36 && request.resource.data.updatedAt==request.time
+    && request.resource.data.points is int && request.resource.data.points>=0 && request.resource.data.points<=2147483647
+    && request.resource.data.matches is int && request.resource.data.matches>=1 && request.resource.data.matches<=10000000
+    && !exists(rp(request.auth.uid,request.resource.data.lastReceipt))
+    && getAfter(rp(request.auth.uid,request.resource.data.lastReceipt)).data.leagueId==c
+    && getAfter(rp(request.auth.uid,request.resource.data.lastReceipt)).data.createdAt==request.time
+    && request.resource.data.points==(exists(/databases/$(database)/documents/leagueBattle/$(c))?resource.data.points:0)+getAfter(rp(request.auth.uid,request.resource.data.lastReceipt)).data.points
+    && request.resource.data.matches==(exists(/databases/$(database)/documents/leagueBattle/$(c))?resource.data.matches+1:1);
+  }
+  function arenaMember(s,g){let d=get(ar(s)).data;return signed() && d.status=='matched' && d.generation==g && request.auth.uid in [d.host,d.guest];}
+  function arenaPart(s,g,u,n){return getAfter(/databases/$(database)/documents/arenaSlots/$(s)/games/$(g)/players/$(u)/parts/$(n)).data;}
+  function arenaScore(s,g,u,d){let a=arenaPart(s,g,u,'0');let b=arenaPart(s,g,u,'1');let c=arenaPart(s,g,u,'2');let e=arenaPart(s,g,u,'3');let h=arenaPart(s,g,u,'4');let j=arenaPart(s,g,u,'5');let k=arenaPart(s,g,u,'6');let l=arenaPart(s,g,u,'7');let m=arenaPart(s,g,u,'8');
+   return a.updatedAt==request.time && b.updatedAt==request.time && c.updatedAt==request.time && e.updatedAt==request.time && h.updatedAt==request.time && j.updatedAt==request.time && k.updatedAt==request.time && l.updatedAt==request.time && m.updatedAt==request.time
+    && d.dead==(a.dead||b.dead||c.dead||e.dead||h.dead||j.dead||k.dead||l.dead||m.dead)
+    && d.score==(d.dead?0:a.sum+b.sum+c.sum+e.sum+h.sum+j.sum+k.sum+l.sum+m.sum)
+    && d.good==(d.dead?0:a.good+b.good+c.good+e.good+h.good+j.good+k.good+l.good+m.good);}
+  function arenaRound(t,p,i,seed,day,off,cap){
+   let a=t[2*i];let b=t[2*i+1];let v=p[i];let c=color(seed,day,i+off);
+   return a is int && b is int && v is int && a>=-1 && a<=cap && b>=-1 && b<=cap
+    && (b==-1 || (a>=0 && b>=a))
+    && v==(c==0?(a>=0 && b==-1?500:0):(c==1?(a>=0 && b-a>=75 && b-a<=480?700:0):(c==2?(a==-1?250:0):(a==-1?400:-1))));
+  }
+  function arenaPartValid(d,seed,day,n,m){let off=int(n)*4;let cap=m=='challenge'?650:m=='sync'?900:950;let decay=m=='endless'?25:0;
+   return d.keys().size()==7
+    && d.t is list && d.t.size()==8 && d.p is list && d.p.size()==4
+    && arenaRound(d.t,d.p,0,seed,day,off,cap-int((off+0) / 3)*decay) && arenaRound(d.t,d.p,1,seed,day,off,cap-int((off+1) / 3)*decay)
+    && arenaRound(d.t,d.p,2,seed,day,off,cap-int((off+2) / 3)*decay) && arenaRound(d.t,d.p,3,seed,day,off,cap-int((off+3) / 3)*decay)
+    && d.dead==d.p.hasAny([-1]) && d.sum==d.p[0]+d.p[1]+d.p[2]+d.p[3]
+    && d.good==(d.p[0]>0?1:0)+(d.p[1]>0?1:0)+(d.p[2]>0?1:0)+(d.p[3]>0?1:0);}
+  function arenaResult(s,g,u,d){let r=get(ar(s)).data;
+   return d.keys().hasAll(['uid','generation','round','score','good','dead','status','updatedAt']) && d.keys().hasOnly(['uid','generation','round','score','good','dead','status','updatedAt'])
+    && d.uid==u && d.generation==g && d.updatedAt==request.time && d.round is int && d.round>=0 && d.round<=12
+    && d.score is int && d.score>=0 && d.score<=25200 && d.good is int && d.good>=0 && d.good<=36 && d.dead is bool
+    && d.status in ['playing','saved','left'] && request.time<r.createdAt+duration.value(120,'s')
+    && request.time>=r.joinedAt+duration.value(5000+d.round*1450,'ms')
+    && (d.status!='saved'?d.round<12:(d.round==12 && arenaScore(s,g,u,d)));}
+  match /arenaSlots/{s} {
+   allow get: if signed();allow list: if signed() && request.query.limit<=8;allow delete: if false;
+   allow create,update: if signed() && (
+    (request.resource.data.keys().hasAll(['mode','targetUid','host','hostAlias','guest','guestAlias','status','generation','seed','scoreSeed','dayKey','createdAt','joinedAt'])
+     && request.resource.data.keys().hasOnly(['mode','targetUid','host','hostAlias','guest','guestAlias','status','generation','seed','scoreSeed','dayKey','createdAt','joinedAt'])
+     && mode(request.resource.data.mode) && s.matches('^(fall|classic|rise|sync|daily|endless|challenge|course|party)-[0-7]$')
+     && s==request.resource.data.mode+'-'+s.split('-')[1]
+     && request.resource.data.targetUid is string && request.resource.data.targetUid.size()<=128 && request.resource.data.targetUid!=request.auth.uid
+     && request.resource.data.host==request.auth.uid && request.resource.data.hostAlias==get(sp(request.auth.uid)).data.alias
+     && request.resource.data.guest=='' && request.resource.data.guestAlias=='' && request.resource.data.status=='waiting'
+     && request.resource.data.generation is string && request.resource.data.generation.matches('^[a-f0-9-]{36}$')
+     && request.resource.data.seed is int && request.resource.data.seed>=1 && request.resource.data.seed<=1000000 && (request.resource.data.mode!='daily'||request.resource.data.seed==1)
+     && request.resource.data.scoreSeed==modeSeed(request.resource.data.seed,request.resource.data.mode)
+     && request.resource.data.dayKey==today() && request.resource.data.createdAt==request.time && request.resource.data.joinedAt==null
+     && (!exists(ar(s))||resource.data.status=='cancelled'||request.time>resource.data.createdAt+duration.value(120,'s')))
+    || (resource.data.status=='waiting' && resource.data.host!=request.auth.uid && (resource.data.targetUid==''||resource.data.targetUid==request.auth.uid)
+     && request.time<resource.data.createdAt+duration.value(25,'s') && request.resource.data.status=='matched' && request.resource.data.guest==request.auth.uid
+     && request.resource.data.guestAlias==get(sp(request.auth.uid)).data.alias && request.resource.data.joinedAt==request.time
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest','guestAlias','joinedAt','status']))
+    || (resource.data.host==request.auth.uid && resource.data.status=='waiting' && request.resource.data.status=='cancelled'
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])));
+   allow update: if signed() && resource.data.status=='matched' && request.auth.uid in [resource.data.host,resource.data.guest]
+    && !('leftUid' in resource.data) && request.resource.data.leftUid==request.auth.uid && request.resource.data.leftAt==request.time
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftUid','leftAt']);
+   match /games/{g}/players/{u} {
+    allow get: if arenaMember(s,g) && u in [get(ar(s)).data.host,get(ar(s)).data.guest];
+    allow list: if arenaMember(s,g) && request.query.limit<=2;
+    allow create: if own(u) && arenaMember(s,g) && arenaResult(s,g,u,request.resource.data);
+    allow update: if own(u) && arenaMember(s,g) && resource.data.status=='playing' && request.resource.data.round>=resource.data.round && arenaResult(s,g,u,request.resource.data);
+    allow delete: if false;
+    match /parts/{n} {
+     allow read,delete: if false;
+     // Final-result authorization is checked atomically on ap(s,g,u); parts bind to that same commit.
+     allow create,update: if own(u) && n in ['0','1','2','3','4','5','6','7','8']
+      && request.resource.data.matchId==g && request.resource.data.updatedAt==request.time && getAfter(ap(s,g,u)).data.status=='saved'
+      && getAfter(ap(s,g,u)).data.updatedAt==request.time
+      && arenaPartValid(request.resource.data,get(ar(s)).data.scoreSeed,get(ar(s)).data.dayKey,n,get(ar(s)).data.mode);
+    }
+   }
+  }
+  match /{document=**}{allow read,write: if false;}
+ }
+}
