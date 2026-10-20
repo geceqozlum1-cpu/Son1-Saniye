@@ -4,6 +4,8 @@ import android.os.Bundle;
 import android.graphics.Color;
 import android.webkit.WebView;
 import android.webkit.WebChromeClient;
+import android.webkit.ConsoleMessage;
+import android.util.Log;
 import android.webkit.WebViewClient;
 import android.webkit.WebSettings;
 import android.webkit.WebResourceRequest;
@@ -27,8 +29,22 @@ public final class MainActivity extends Activity {
   s.setAllowFileAccessFromFileURLs(false);
   s.setAllowUniversalAccessFromFileURLs(false);
   s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-  web.setWebChromeClient(new WebChromeClient());
+  web.setWebChromeClient(new WebChromeClient(){
+   @Override public boolean onConsoleMessage(ConsoleMessage cm){
+    if(cm.messageLevel()==ConsoleMessage.MessageLevel.ERROR || cm.messageLevel()==ConsoleMessage.MessageLevel.WARNING)
+     Log.e("SON1_JS",cm.message()+" @"+cm.sourceId()+":"+cm.lineNumber());
+    return true;
+   }
+  });
   web.setWebViewClient(new WebViewClient(){
+   @Override public void onPageFinished(WebView v,String url){
+    super.onPageFinished(v,url);
+    Log.i("SON1_DOM","Page loaded "+url);
+    v.postDelayed(()->v.evaluateJavascript(
+     "(function(){try{var m=document.getElementById('menuView'), l=document.getElementById('v10Lobby');return JSON.stringify({ready:document.readyState,game:!!window.Son1V13,v10:!!window.Son1V10,lobby:!!l,hidden:m?.hidden,menuDisplay:m?getComputedStyle(m).display:'missing',q:!!document.getElementById('v28QualityControl'),width:m?m.getBoundingClientRect().width:0,childCount:m?m.children.length:0,jsOn:typeof Son1V13Core,scriptCount:document.scripts.length});}catch(e){return 'ERROR: '+e.message;}})()",
+     val->Log.i("SON1_DOM",val)),3000);
+   }
+
    @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req){
     Uri u=req.getUrl();
     if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost()))return super.shouldInterceptRequest(view,req);
