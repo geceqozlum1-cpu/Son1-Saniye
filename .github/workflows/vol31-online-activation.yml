@@ -1,0 +1,73 @@
+name: VOL31 - Safely Activate Online Arena
+on:
+  push:
+    branches: [vol31-online-activation]
+    paths:
+      - 'firebase/firestore.rules'
+      - 'firebase/firestore.vol28-baseline.rules'
+      - 'tests/v31-rules-security.test.cjs'
+      - 'scripts/vol31_live_rules_preflight.py'
+      - '.github/workflows/vol31-online-activation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  validate:
+    name: Emulator security validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Firebase CLI and test libraries
+        run: |
+          npm ci
+          npm install --global firebase-tools@14
+      - name: Check V30 local matchmaking protocol
+        run: node --test tests/v30.matchmaking.test.cjs
+      - name: Compile rules and test client security in Firestore emulator
+        run: |
+          firebase emulators:exec --project demo-son1-free --config firebase/emulator.json --only firestore "node --test --test-concurrency=1 tests/v31-rules-security.test.cjs"
+  deploy:
+    name: Backup, compare and publish only Firestore rules
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require existing GCP authorization
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          DEPLOY_SA: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$WIF_PROVIDER" || { echo "BLOCKED: GCP_WORKLOAD_IDENTITY_PROVIDER is not configured"; exit 1; }
+          test -n "$DEPLOY_SA" || { echo "BLOCKED: GCP_DEPLOY_SERVICE_ACCOUNT is not configured"; exit 1; }
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Backup live rules and reject unexpected remote changes
+        run: python3 scripts/vol31_live_rules_preflight.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: VOL31_LIVE_RULES_BACKUP_BEFORE_DEPLOY
+          path: dist/firebase-live-rules-*
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Publish only Firestore Security Rules
+        run: |
+          npm install --global firebase-tools@14
+          firebase deploy --only firestore:rules --config firebase/firebase.json --project son-1-saniye-78761 --non-interactive
+      - name: Record successful activation
+        run: echo "VOL31 Firestore Security Rules deployment completed. Anonymous Auth and two-device tests must be verified separately."
