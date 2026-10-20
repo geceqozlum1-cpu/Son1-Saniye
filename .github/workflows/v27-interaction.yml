@@ -1,0 +1,52 @@
+name: V27 Android Menu Interaction Diagnostic
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/v27-interaction.yml']
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch EXACT signed V27 artifact from successful build
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 39385320950
+          name: SON_1_SANIYE_V27_STANDART_IMZALI_APK
+          path: ./verified-apk
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Allow KVM
+        run: |
+          if test -e /dev/kvm; then sudo chmod 666 /dev/kvm; fi
+      - name: Install and inspect real menu interaction
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            set -eux
+            adb install -r verified-apk/app-debug.apk
+            adb shell am start -W -n com.sonbirsaniye.son1saniye.v26/com.sonbirsaniye.arcade.MainActivity
+            sleep 8
+            adb shell screencap -p /sdcard/v27-before-menu.png
+            adb pull /sdcard/v27-before-menu.png ./v27-before-menu.png
+            adb shell input tap 950 1520
+            sleep 5
+            adb shell screencap -p /sdcard/v27-after-menu.png
+            adb pull /sdcard/v27-after-menu.png ./v27-after-menu.png
+            adb shell pidof com.sonbirsaniye.son1saniye.v26
+      - name: Publish interaction screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SON_1_SANIYE_V27_MENU_ETKILESIM_KANITI
+          path: |
+            ./v27-before-menu.png
+            ./v27-after-menu.png
+          if-no-files-found: warn
