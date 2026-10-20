@@ -1239,6 +1239,12 @@ body.v28-reduce-motion #v10Lobby *,body.v28-reduce-motion #v10Match *,body.v28-r
 #menuView:not(:has(> #v10Lobby))> .sub{display:block!important}
 #menuView:not(:has(> #v10Lobby))> .orb-gallery{display:flex!important}
 #menuView:not(:has(> #v10Lobby)) #startBtn{display:inline-flex!important}
+/* Older Android WebView does not implement :has(); use a synchronized class instead. */
+body.v28-lobby-active #app>.hud{display:none!important}
+body.v28-lobby-active #v19HomeFloat{display:none!important}
+body.v28-lobby-active #app .arena{min-height:720px;flex:none;overflow:visible!important}
+body.v28-lobby-active #v10Lobby{visibility:visible!important}
+@media(max-width:520px){body.v28-lobby-active #app .arena{min-height:650px}}
 @media(min-width:720px){#v28QualityPanel{width:430px}}
 </style>
 </head>
@@ -3545,6 +3551,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  let samples=[],last=0;
  function sample(t){if(!last){last=t;requestAnimationFrame(sample);return}const delta=t-last;last=t;if(delta>5&&delta<200)samples.push(delta);if(samples.length<70)requestAnimationFrame(sample);else{const sorted=samples.sort((a,b)=>a-b);fps=Math.round(1000/sorted[Math.floor(sorted.length/2)]);apply()}}
  if(typeof requestAnimationFrame==='function')requestAnimationFrame(sample);
+ const menuRoot=document.getElementById('menuView');
+ const reflectMenu=()=>document.body.classList.toggle('v28-lobby-active',!!(menuRoot&&!menuRoot.hidden&&document.getElementById('v10Lobby')));
+ if(menuRoot){new MutationObserver(reflectMenu).observe(menuRoot,{attributes:true,attributeFilter:['hidden']});}
+ reflectMenu();
  window.SON1_VOL28={version:'28.0-development',graphics:()=>({preference,applied:chosen,approximateFPS:fps,reducedMotion:reduce}),setGraphics:v=>{if(!MODES.includes(v))return false;preference=v;try{localStorage.setItem(STORE,v)}catch{}apply();return true}};
 })();
 </script>
