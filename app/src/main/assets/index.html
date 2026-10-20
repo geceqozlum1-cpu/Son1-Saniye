@@ -1218,6 +1218,29 @@ body.v26-lowpower #v10Field .v10-orb{box-shadow:inset 2px 3px 9px #ffffff65,inse
 @media(max-width:380px){#v10Match #v25Waiting{padding:14px 12px!important}#v10Match #v25Waiting .v27-search-actions button{font-size:9px}}
 @media(prefers-reduced-motion:reduce){#v10Match #v10Field .v10-orb{transition:none!important;animation:none!important}}
 </style>
+<style id="v28-quality-and-fallback">
+/* VOL28 is additive; visual quality changes cannot modify game targets, scores or timing. */
+#v28QualityControl{display:block;width:100%;margin:7px 0 14px;flex:0 0 auto;border:1px solid #668fc6!important;border-radius:12px!important;background:linear-gradient(145deg,#12264a,#142338)!important;min-height:42px!important;padding:8px 12px!important;color:#dbeaff!important;font-size:10px!important;letter-spacing:.5px!important}
+#v28QualityPanel{border:1px solid #669ed7;border-radius:24px;background:radial-gradient(ellipse at top,#1b345a,#0a122b 74%);color:#f2f6ff;width:min(92vw,420px);padding:22px;box-shadow:0 28px 110px #000b}
+#v28QualityPanel::backdrop{background:#050a19dc;backdrop-filter:blur(5px)}
+#v28QualityPanel h2{font-size:22px;line-height:1.3;margin:0 0 6px}
+#v28QualityPanel p{color:#a6c2e2;font-size:12px;line-height:1.6;margin:5px 0 15px}
+#v28QualityPanel label{display:flex;gap:12px;align-items:center;margin:10px 0;background:#13284c;border:1px solid #3b5883;border-radius:13px;padding:12px;font-size:13px}
+#v28QualityPanel input{accent-color:#c8fe67;min-width:18px;min-height:18px}
+#v28QualityPanel button{padding:13px 20px;border-radius:12px;background:linear-gradient(130deg,#d4fd7b,#83eacc);color:#071828;font-weight:900;border:none;width:100%;margin-top:10px}
+#v28QualityPanel small{display:block;color:#a9bacd;font-size:11px;margin-top:13px;line-height:1.5}
+body.v28-eco #v10Match #v10Field:before,body.v28-eco #v10Field .v13-space,body.v28-eco #v10Field .v13-energy,body.v28-eco #v10Field .v13-stars{animation:none!important;filter:none!important;box-shadow:none!important}
+body.v28-eco #v10Match #v10Field .v10-orb{filter:none!important;backdrop-filter:none!important;transition:none!important;box-shadow:inset 0 2px 5px #ffffffa1,inset 0 -8px 14px #0007,0 0 0 2px #ffffff25!important}
+body.v28-eco #v10Lobby .v10-rain,body.v28-eco #v10Lobby .v13-space{animation:none!important;filter:none!important}
+body.v28-reduce-motion #v10Lobby *,body.v28-reduce-motion #v10Match *,body.v28-reduce-motion #v28QualityPanel *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+/* When online boot does not mount, never leave a fully invisible legacy menu. */
+#menuView:not(:has(> #v10Lobby))> .eyebrow{display:block!important}
+#menuView:not(:has(> #v10Lobby))> .hero-title{display:block!important}
+#menuView:not(:has(> #v10Lobby))> .sub{display:block!important}
+#menuView:not(:has(> #v10Lobby))> .orb-gallery{display:flex!important}
+#menuView:not(:has(> #v10Lobby)) #startBtn{display:inline-flex!important}
+@media(min-width:720px){#v28QualityPanel{width:430px}}
+</style>
 </head>
 <body>
 <main class="app" id="app">
@@ -3465,6 +3488,51 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  window.SON1_V27={version:'27.0-local-test',trackArena,metrics:()=>{const s=window.Son1V13?.match?.();return s?{mode:s.mode,bot:!!s.bot,stages:s.completed,done:!!s.done,serverSaved:!!s.submitted}:null;}};
 })();
 
+</script>
+<script id="v28-adaptive-rendering">
+/* Isolated VOL28 graphics preferences. Never changes target positions, collision detection,
+ * scoring, match clocks, server messages, matchmaking or reward entitlement. */
+(()=>{'use strict';
+ const STORE='son1-v28-graphics',MODES=['auto','premium','eco'];
+ const read=()=>{try{const v=localStorage.getItem(STORE);return MODES.includes(v)?v:'auto'}catch{return 'auto'}};
+ let preference=read(),fps=null,chosen='premium',menu=null,btn=null,reduce=false;
+ try{reduce=matchMedia('(prefers-reduced-motion: reduce)').matches}catch{}
+ function apply(){
+  const ram=Number(navigator.deviceMemory||4),threads=Number(navigator.hardwareConcurrency||4);
+  chosen=preference==='eco'||(preference==='auto'&&(ram<=2||threads<=2||(fps!==null&&fps<39)))?'eco':'premium';
+  document.body.classList.toggle('v28-eco',chosen==='eco');
+  document.body.classList.toggle('v28-reduce-motion',reduce);
+  if(btn)btn.textContent='⚙ GRAFİK · '+(chosen==='eco'?'EKO':'PREMİUM');
+  const state=document.getElementById('v28QualityReadout');
+  if(state)state.textContent='Etkin kalite: '+(chosen==='eco'?'Ekonomi':'Premium')+' · '+(fps===null?'FPS ölçülmedi':'Ölçülen yaklaşık FPS: '+fps);
+ }
+ function mount(){
+  if(menu&&menu.isConnected&&btn&&btn.isConnected)return true;
+  const nav=document.querySelector('#v10Lobby .v10-playerbar');if(!nav)return false;
+  menu=document.getElementById('v28QualityPanel');
+  if(!menu){menu=document.createElement('dialog');menu.id='v28QualityPanel';menu.setAttribute('aria-label','Grafik ve hareket ayarları');
+   menu.innerHTML='<h2>✦ Görüntü Kalitesi</h2><p>Oyun adaleti ve refleks süreleri korunur. Yalnızca görsel efekt yoğunluğu değişir.</p>'+MODES.map(m=>`<label><input type="radio" name="v28Quality" value="${m}"> <span>${m==='auto'?'Otomatik (önerilen)':m==='premium'?'Premium grafik':'Ekonomi · daha az efekt'}</span></label>`).join('')+'<label><input type="checkbox" id="v28Motion"> <span>Animasyonları azalt</span></label><small id="v28QualityReadout"></small><button id="v28QualityDone" type="button">TAMAM</button><small>Gerçek telefon FPS değeri ayrıca ölçülmelidir. Bu seçenek çevrim içi maçların doğruluğunu etkilemez.</small>';
+   document.body.append(menu);
+   menu.addEventListener('change',e=>{
+    const v=e.target.value;if(e.target.name==='v28Quality'&&MODES.includes(v)){preference=v;try{localStorage.setItem(STORE,v)}catch{}apply()}
+    if(e.target.id==='v28Motion'){reduce=!!e.target.checked;apply()}
+   });
+   menu.querySelector('#v28QualityDone').addEventListener('click',()=>menu.close());
+  }
+  btn=document.getElementById('v28QualityControl');
+  if(!btn){btn=document.createElement('button');btn.type='button';btn.id='v28QualityControl';btn.setAttribute('aria-label','Grafik performans ayarlarını aç');nav.insertAdjacentElement('afterend',btn);btn.addEventListener('click',()=>{menu.querySelectorAll('input[name="v28Quality"]').forEach(el=>el.checked=el.value===preference);menu.querySelector('#v28Motion').checked=reduce;if(!menu.open)menu.showModal();apply()})}
+  apply();return true;
+ }
+ const obs=new MutationObserver(()=>{if(mount()){obs.disconnect()}});
+ if(!mount())obs.observe(document.documentElement,{childList:true,subtree:true});
+ function ready(){mount();}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+ // Bounded sample on idle layout; not continuous and not used to award competitive scores.
+ let samples=[],last=0;
+ function sample(t){if(!last){last=t;requestAnimationFrame(sample);return}const delta=t-last;last=t;if(delta>5&&delta<200)samples.push(delta);if(samples.length<70)requestAnimationFrame(sample);else{const sorted=samples.sort((a,b)=>a-b);fps=Math.round(1000/sorted[Math.floor(sorted.length/2)]);apply()}}
+ if(typeof requestAnimationFrame==='function')requestAnimationFrame(sample);
+ window.SON1_VOL28={version:'28.0-development',graphics:()=>({preference,applied:chosen,approximateFPS:fps,reducedMotion:reduce}),setGraphics:v=>{if(!MODES.includes(v))return false;preference=v;try{localStorage.setItem(STORE,v)}catch{}apply();return true}};
+})();
 </script>
 </body>
 </html>
