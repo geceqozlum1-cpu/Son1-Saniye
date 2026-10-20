@@ -445,10 +445,13 @@ service cloud.firestore {
     allow delete: if false;
     // VOL32 optional live telemetry: only authenticated room members; NO ranked results.
    match /games/{generation}/live/{uid} {
-    allow get, list: if request.auth!=null && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
+    allow get: if request.auth!=null && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
+      && v30GameRoom(id).status=='matched' && v30GameRoom(id).generation==generation
+      && request.auth.uid in [v30GameRoom(id).host,v30GameRoom(id).guest];
+    allow list: if request.auth!=null && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
       && v30GameRoom(id).status=='matched' && v30GameRoom(id).generation==generation
       && request.auth.uid in [v30GameRoom(id).host,v30GameRoom(id).guest]
-      && (request.query.limit==null || request.query.limit<=2);
+      && request.query.limit!=null && request.query.limit<=2;
     allow create: if request.auth!=null && request.auth.uid==uid
       && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
       && v30GameRoom(id).status=='matched' && v30GameRoom(id).generation==generation
