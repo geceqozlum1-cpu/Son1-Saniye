@@ -1,0 +1,50 @@
+name: VOL28 Final Emulator Premium Menu 35s Check
+on:
+  push:
+    branches: [vol28-development]
+    paths: ['.github/workflows/vol28-final-startup.yml']
+  workflow_dispatch:
+jobs:
+  android-menu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 39390619596
+          name: SON_1_SANIYE_VOL28_STANDART_IMZALI_APK
+          path: ./verified-apk
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: KVM accelerator
+        run: |
+          if test -e /dev/kvm; then sudo chmod 666 /dev/kvm; fi
+      - name: Install exact verified APK, wait for premium menu
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          profile: pixel_2
+          emulator-boot-timeout: 900
+          script: |
+            set -eux
+            adb logcat -c
+            adb install -r verified-apk/app-debug.apk
+            adb shell am start -W -n com.sonbirsaniye.son1saniye.v26/com.sonbirsaniye.arcade.MainActivity
+            sleep 35
+            adb shell pidof com.sonbirsaniye.son1saniye.v26
+            adb exec-out screencap -p > vol28-final-35s.png
+            test -s vol28-final-35s.png
+            adb logcat -d -s AndroidRuntime:E > crash_log.txt
+            test -z "$(grep -A 8 -F 'FATAL EXCEPTION' crash_log.txt | grep 'com.sonbirsaniye.son1saniye.v26' || true)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: VOL28_FINAL_35S_ANDROID_SCREENSHOT
+          path: |
+            ./vol28-final-35s.png
+            ./crash_log.txt
+          if-no-files-found: warn
