@@ -1,0 +1,30 @@
+name: VOL32 - Live Score Security Test Only
+on:
+  push:
+    branches: [vol32-live-score-additive]
+    paths:
+      - 'firebase/firestore.rules'
+      - 'tests/v32-rules-security.test.cjs'
+      - '.github/workflows/vol32-live-score-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firestore-emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install test dependencies
+        run: |
+          npm ci
+          npm install -g firebase-tools@14
+      - name: Ensure online rules compile and check permissions
+        run: firebase emulators:exec --project demo-son1-free --config firebase/emulator.json --only firestore "node --test --test-concurrency=1 tests/v31-rules-security.test.cjs tests/v32-rules-security.test.cjs"
