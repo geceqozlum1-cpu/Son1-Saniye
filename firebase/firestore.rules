@@ -443,7 +443,40 @@ service cloud.firestore {
         && request.resource.data.leftAt==request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftUid','leftAt']));
     allow delete: if false;
-    match /games/{generation}/players/{uid} {
+    // VOL32 optional live telemetry: only authenticated room members; NO ranked results.
+   match /games/{generation}/live/{uid} {
+    allow get, list: if request.auth!=null && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
+      && v30GameRoom(id).status=='matched' && v30GameRoom(id).generation==generation
+      && request.auth.uid in [v30GameRoom(id).host,v30GameRoom(id).guest]
+      && (request.query.limit==null || request.query.limit<=2);
+    allow create: if request.auth!=null && request.auth.uid==uid
+      && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
+      && v30GameRoom(id).status=='matched' && v30GameRoom(id).generation==generation
+      && uid in [v30GameRoom(id).host,v30GameRoom(id).guest]
+      && request.time>=v30GameRoom(id).joinedAt && request.time<v30GameRoom(id).joinedAt+duration.value(900,'s')
+      && request.resource.data.keys().hasAll(['uid','generation','seq','score','stage','updatedAt'])
+      && request.resource.data.keys().hasOnly(['uid','generation','seq','score','stage','updatedAt'])
+      && request.resource.data.uid==uid && request.resource.data.generation==generation
+      && request.resource.data.seq==1
+      && request.resource.data.score is int && request.resource.data.score>=0 && request.resource.data.score<=10000000
+      && request.resource.data.stage is int && request.resource.data.stage>=0 && request.resource.data.stage<=25
+      && request.resource.data.updatedAt==request.time;
+    allow update: if request.auth!=null && request.auth.uid==uid
+      && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
+      && v30GameRoom(id).status=='matched' && v30GameRoom(id).generation==generation
+      && uid in [v30GameRoom(id).host,v30GameRoom(id).guest]
+      && request.time>=resource.data.updatedAt+duration.value(400,'ms')
+      && request.time<v30GameRoom(id).joinedAt+duration.value(900,'s')
+      && request.resource.data.keys().hasAll(['uid','generation','seq','score','stage','updatedAt'])
+      && request.resource.data.keys().hasOnly(['uid','generation','seq','score','stage','updatedAt'])
+      && request.resource.data.uid==resource.data.uid && request.resource.data.generation==resource.data.generation
+      && request.resource.data.seq==resource.data.seq+1 && request.resource.data.seq<=10000
+      && request.resource.data.score is int && request.resource.data.score>=0 && request.resource.data.score<=10000000
+      && request.resource.data.stage is int && request.resource.data.stage>=resource.data.stage && request.resource.data.stage<=25
+      && request.resource.data.updatedAt==request.time;
+    allow delete: if false;
+   }
+   match /games/{generation}/players/{uid} {
       allow get, list: if request.auth!=null
         && exists(/databases/$(database)/documents/arenaV30Rooms/$(id))
         && v30GameRoom(id).generation==generation
