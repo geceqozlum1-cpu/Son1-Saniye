@@ -1,0 +1,37 @@
+name: VOL28 Online Firebase Regression (separate from Android APK)
+on:
+  push:
+    branches: [vol28-development]
+    paths: ['.github/workflows/vol28-online-regression.yml']
+  workflow_dispatch:
+jobs:
+  firebase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned JavaScript dependencies
+        run: npm ci --ignore-scripts
+      - name: Static checks for all network and Firebase modules
+        run: |
+          find online -name '*.js' -print0 | xargs -0 -n1 node --check
+          find firebase/functions -name '*.js' -print0 | xargs -0 -n1 node --check
+          python3 tests/test_deploy_free.py
+      - name: Security and two-player Firestore emulator tests
+        run: npx -y firebase-tools@latest emulators:exec --only firestore --project demo-son1-free --config firebase/emulator.json "node --test --test-concurrency=1 tests/free-league.test.cjs tests/duel.test.cjs tests/arena.test.cjs"
+      - name: Browser tests in Firebase Auth + Firestore emulator
+        run: |
+          npx playwright install --with-deps chromium --only-shell
+          npx -y firebase-tools@latest emulators:exec --only firestore,auth --project demo-son1-free --config firebase/emulator.json "node tests/browser-v10.cjs"
