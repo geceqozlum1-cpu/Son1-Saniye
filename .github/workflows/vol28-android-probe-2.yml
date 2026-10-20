@@ -1,4 +1,4 @@
-name: VOL28 Android WebView DOM Recheck
+name: VOL28 Android WebView Delayed DOM Check
 on:
   push:
     branches: [vol28-webview-probe-2]
@@ -34,7 +34,7 @@ jobs:
             adb logcat -c
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -W -n com.sonbirsaniye.son1saniye.v26/com.sonbirsaniye.arcade.MainActivity
-            sleep 10
+            sleep 35
             adb logcat -d -s SON1_JS:E SON1_DOM:I AndroidRuntime:E > webview_log.txt
             cat webview_log.txt
             adb shell screencap -p /sdcard/vol28-probe.png
