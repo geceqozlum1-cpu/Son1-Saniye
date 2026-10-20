@@ -1,0 +1,25 @@
+name: VOL28 Complete Repository Source Snapshot
+on:
+  push:
+    branches: [vol28-development]
+    paths: ['.github/workflows/vol28-source.yml']
+  workflow_dispatch:
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive tracked Android, game, social and Firebase sources
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git ls-files -z | xargs -0 zip -q dist/SON_1_SANIYE_VOL28_GITHUB_KAYNAK.zip
+          unzip -t dist/SON_1_SANIYE_VOL28_GITHUB_KAYNAK.zip | tail -1
+          sha256sum app/src/main/assets/index.html
+          echo "Source commit:" && git rev-parse HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SON_1_SANIYE_VOL28_GITHUB_TAM_KAYNAK
+          path: dist/SON_1_SANIYE_VOL28_GITHUB_KAYNAK.zip
+          if-no-files-found: error
