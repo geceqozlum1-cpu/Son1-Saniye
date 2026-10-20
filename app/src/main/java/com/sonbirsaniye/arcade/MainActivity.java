@@ -4,6 +4,8 @@ import android.os.Bundle;
 import android.graphics.Color;
 import android.webkit.WebView;
 import android.webkit.WebChromeClient;
+import android.webkit.ConsoleMessage;
+import android.util.Log;
 import android.webkit.WebViewClient;
 import android.webkit.WebSettings;
 import android.webkit.WebResourceRequest;
@@ -27,8 +29,15 @@ public final class MainActivity extends Activity {
   s.setAllowFileAccessFromFileURLs(false);
   s.setAllowUniversalAccessFromFileURLs(false);
   s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-  web.setWebChromeClient(new WebChromeClient());
+  web.setWebChromeClient(new WebChromeClient(){
+   @Override public boolean onConsoleMessage(ConsoleMessage cm){
+    Log.e("SON1_JS", cm.message()+" at "+cm.sourceId()+":"+cm.lineNumber());return true;
+   }
+  });
   web.setWebViewClient(new WebViewClient(){
+   @Override public void onPageFinished(WebView v, String url){
+    v.postDelayed(()->v.evaluateJavascript("(function(){return JSON.stringify({v10:typeof Son1V10,duel:typeof Son1DuelUI,lobby:!!document.getElementById('v10Lobby'),home:!!document.getElementById('v14Home'),mode:!!document.getElementById('menuView'),visible:document.getElementById('menuView')?.getBoundingClientRect().height,UA:navigator.userAgent});})()", value ->Log.i("SON1_DOM",value)),1200);
+   }
    @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req){
     Uri u=req.getUrl();
     if(!"https".equals(u.getScheme())||!"appassets.androidplatform.net".equals(u.getHost()))return super.shouldInterceptRequest(view,req);
