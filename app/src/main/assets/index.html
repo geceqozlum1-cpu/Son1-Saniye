@@ -1150,7 +1150,6 @@ body{color:#f3f8ff;background:radial-gradient(circle at 50% 0%,#15234b,#080d20 5
 #v14Home .v20-home-art .logo{position:relative!important;left:auto!important;right:auto!important;bottom:auto!important;z-index:2!important;width:100%;padding:0 8px clamp(22px,6vw,38px)!important;box-sizing:border-box;background:linear-gradient(180deg,transparent,rgba(3,7,19,.44) 70%,rgba(3,7,19,.65))}
 #v14Home .v20-home-art .logo strong{font-size:clamp(32px,9.5vw,60px)!important;line-height:1!important;filter:drop-shadow(0 5px 8px #000b);letter-spacing:-1.5px!important}
 #v14Home .v20-home-art .logo>span{font-size:clamp(9px,2.4vw,13px)!important;letter-spacing:.8px!important;margin-top:8px!important;color:#d9eaff!important}
-#v19HomeFloat{display:none!important} /* Bottom navigation already provides an accessible home control; prevent overlap. */
 #v14Home .v14-shortcuts{gap:10px!important}
 #v14Home .v14-shortcuts button{border:1px solid var(--v26-border)!important;background:linear-gradient(150deg,rgba(18,42,87,.92),rgba(7,18,40,.98))!important;border-radius:18px!important;box-shadow:0 12px 22px #0005!important}
 #v10Lobby .v10-hero,#v10Lobby .v10-row,#v10Lobby .v10-options,#v10Lobby .v11-chat,#v10Lobby .v10-code{border-color:var(--v26-border)!important;background:linear-gradient(165deg,rgba(17,37,78,.96),rgba(7,16,36,.98))!important;box-shadow:0 12px 24px #0004,inset 0 1px #ffffff0a!important}
@@ -1203,6 +1202,22 @@ body.v26-lowpower #v10Match .v13-space,body.v26-lowpower #v10Match .v13-energy{d
 @media(prefers-reduced-motion:reduce){#v10Match #v10Field .v10-orb:before,#v10Match #v10Field .v10-orb:after{animation:none!important}}
 </style>
 
+
+<style id="v27-stable-layout">
+#v10Match[open] {inset:0!important;width:100dvw!important;max-width:100dvw!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;padding:0!important;overflow:hidden!important}
+#v10Match #v25Waiting{box-sizing:border-box!important;position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;margin:0!important;width:min(92vw,420px)!important;max-width:calc(100vw - 24px)!important;min-width:0!important;padding:18px 16px!important;overflow:hidden!important}
+#v10Match #v25Waiting>*{max-width:100%!important;box-sizing:border-box!important}
+#v10Match #v25Waiting .v27-search-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 12px}
+#v10Match #v25Waiting .v27-search-actions button{min-height:44px;padding:7px!important;border-radius:12px;background:#122c4b;border:1px solid #78c5eb66;color:#effbff;font-weight:800;font-size:10px;white-space:normal}
+#v10Match #v25Waiting #v25GoBot[hidden]{display:none!important}
+#v10Match #v10Field{touch-action:manipulation;contain:layout paint}
+#v10Match #v10Field .v10-orb{will-change:transform;contain:layout style}
+#v10Match #v10Scoreboard{min-width:0!important}
+#v10Match #v10MatchStatus{box-sizing:border-box;overflow-wrap:anywhere}
+body.v26-lowpower #v10Field .v10-orb{box-shadow:inset 2px 3px 9px #ffffff65,inset -5px -8px 14px #0008!important;filter:none!important}
+@media(max-width:380px){#v10Match #v25Waiting{padding:14px 12px!important}#v10Match #v25Waiting .v27-search-actions button{font-size:9px}}
+@media(prefers-reduced-motion:reduce){#v10Match #v10Field .v10-orb{transition:none!important;animation:none!important}}
+</style>
 </head>
 <body>
 <main class="app" id="app">
@@ -1710,15 +1725,18 @@ const $=id=>document.getElementById(id),core=Son1ArenaCore,skinList=Son1Social.S
 let tab='play',selected='fall',social=null,profile=null,friends=[],invites=[],readyPromise=null,heartbeat=null,match=null,token=0,leagueCursor=null,leagueRows=[],rosterUnsub=null,rosterCode='',localTraining=null,leagueFetch=0,rosterFetch=0;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};let practice=read('son1-v10-practice',{xp:0,matches:0}),alias=read('son1-v10-alias','OYUNCU');
-const root=document.createElement('div');root.id='v10Lobby';root.innerHTML=`<div class="v10-playerbar"><button id="v10Player" class="v10-avatar" aria-label="Profilimi aç">S1</button><div><b id="v10Name"></b><small id="v10Level"></small></div><span id="v10Network" role="status">Yerel antrenman hazır</span></div><nav class="v10-nav" aria-label="Ana menü"><button data-v10-tab="play" aria-current="page">OYNA</button><button data-v10-tab="friends">ARKADAŞLAR <i id="v10Badge"></i></button><button data-v10-tab="leagues">LİGLER</button><button data-v10-tab="profile">PROFİL</button></nav><section id="v10PlayPanel"><div class="v10-hero" id="v10Hero"><div class="v10-rain" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="v10-eyebrow">GECENİN ARENASI · CANLI 1V1</span><h1 id="v10ModeTitle">KARANLIK<br><em>YAĞMUR</em></h1><p id="v10ModeHint">Aynı fırtına. İki rakip. Tek zafer.</p><button id="v10Play" class="v10-main">RAKİP BUL <span>↗</span></button><div class="v10-hero-links"><button id="v10PlayFriend">ARKADAŞINLA OYNA</button><button id="v10Practice">BOTLA ANTRENMAN</button></div></div><div class="v10-section-head"><h2>ARENANI SEÇ</h2><span>9 ayrı oynanış · Orijinal uzun kurallar</span></div><div id="v10Modes" class="v10-modegrid"></div><div class="v10-options"><label>Bot gücü <select id="v10Difficulty"><option value="easy">Kolay</option><option value="normal" selected>Normal</option><option value="hard">Zor</option></select></label><label><input type="checkbox" id="v10AutoBot" checked> Rakip yoksa botla oyna</label></div><div id="v12CourseConfig" hidden><div class="v12-settings"><label>Parkur turu <select id="v12CourseRounds"><option value="3">3 tur</option><option value="5" selected>5 tur</option><option value="8">8 tur</option></select></label><label>Zorluk <select id="v12CourseLevel"><option value="1">Kolay</option><option value="2" selected>Normal</option><option value="3">Zor</option></select></label><label><input type="checkbox" id="v12CourseBlack"> Siyah ölüm topu</label></div></div><label id="v10CourseSeedLabel" class="v10-label" hidden>PARKUR TOHUMU (1–1000000)<input id="v10CourseSeed" type="number" min="1" max="1000000" value="2026"></label><p class="v10-note" id="v10Adaptation">Çevrimiçi: 12 dalga · 36 hedef · aynı parkur · canlı skor.</p><div class="v10-subactions"><button id="v10Solo">TEK BAŞINA · UZUN MOD</button><button id="v10Rewards">GÖREVLER & ÖDÜLLER</button></div></section><section id="v10FriendsPanel" hidden><div class="v10-heading"><h2>ARKADAŞLAR</h2><p>Arkadaşını ekle. Çevrimiçiyse aynı arenaya davet et.</p></div><div class="v10-code"><span>ARKADAŞ KODUN</span><button id="v10CopyCode">BAĞLAN</button></div><form id="v10AddForm" class="v10-inline"><input id="v10FriendCode" maxlength="8" placeholder="8 karakterli arkadaş kodu" aria-label="Arkadaş kodu"><button>EKLE</button></form><div id="v10Invites"></div><div id="v10Friends"></div></section><section id="v10LeaguesPanel" hidden><div class="v10-heading"><h2>LİGLER</h2><p>Bir lige katıl. Canlı düellolardan kazandığın puanları ligine taşı.</p></div><div class="v10-options"><label>Düellolarda temsil ettiğin lig <select id="v10ScoringLeague"><option value="">Bireysel oyna</option></select></label></div><details class="v10-details"><summary>LİG KUR / KODLA KATIL</summary><form id="v10CreateForm" class="v10-inline"><input id="v10LeagueName" maxlength="30" placeholder="Yeni lig adı" aria-label="Yeni lig adı"><button>KUR</button></form><form id="v10JoinForm" class="v10-inline"><input id="v10LeagueCode" maxlength="7" placeholder="7 karakterli lig kodu" aria-label="Lig kodu"><button>KATIL</button></form></details><div class="v10-section-head"><h3>LİGLER ARASI YARIŞ</h3><button id="v10RefreshBattle">YENİLE</button></div><div id="v10LeagueBattle"></div><div class="v10-section-head"><h3>TÜM LİGLER</h3><button id="v10RefreshLeagues">YENİLE</button></div><div id="v10Leagues"></div><button id="v10MoreLeagues" class="v10-full" hidden>DAHA FAZLA LİG</button><section id="v10RosterPanel" hidden><h3 id="v10RosterTitle"></h3><div class="v10-subactions"><button id="v10LeagueDuel">BU LİG İÇİN CANLI DÜELLO</button><button id="v10DailyLeague">GÜNLÜK LİG PARKURU</button></div><div id="v10Roster"></div></section></section><section id="v10ProfilePanel" hidden><div class="v10-heading"><h2>OYUNCU PROFİLİ</h2><p>Seviyenin sonu yok. Her tamamlanan mücadele yeni bir adım.</p></div><form id="v10ProfileForm"><label class="v10-label">TAKMA ADIN<input id="v10Alias" maxlength="18" autocomplete="nickname"></label><div class="v10-profile-stats"><div><b id="v10ProfileLevel">1</b><small>SEVİYE</small></div><div><b id="v10ProfileWins">0</b><small>ONLINE ZAFER</small></div><div><b id="v10ProfileMatches">0</b><small>XP KAZANILAN MAÇ</small></div></div><div class="v10-xp"><span id="v10XpBar"></span></div><p id="v10XpText" class="v10-note"></p><h3>SKİNLER</h3><div id="v10Skins" class="v10-skins"></div><button class="v10-full">PROFİLİ KAYDET</button></form><p class="v10-note">Online zafer ve lig puanı yalnızca iki gerçek oyuncunun sunucuda doğrulanmış maçlarından gelir. Bot/solo antrenman: en az 18 saniye, günde 20 XP ödülü. İnternetsiz antrenman ilerlemesi bu cihazda ayrıca saklanır.</p><p id="v10LocalProgress" class="v10-note"></p><details class="v10-details"><summary>DİĞER KOZMETİKLER VE GÖREVLER</summary><button id="v10LegacySkins" class="v10-full">KOLEKSİYONU AÇ</button><button id="v10LegacyQuests" class="v10-full">GÜNLÜK GÖREVLERİ AÇ</button></details></section><p id="v10Notice" class="v10-notice" role="status"></p>`;$('menuView').prepend(root);
+const root=document.createElement('div');root.id='v10Lobby';root.innerHTML=`<div class="v10-playerbar"><button id="v10Player" class="v10-avatar" aria-label="Profilimi aç">S1</button><div><b id="v10Name"></b><small id="v10Level"></small></div><span id="v10Network" role="status">Yerel antrenman hazır</span></div><nav class="v10-nav" aria-label="Ana menü"><button data-v10-tab="play" aria-current="page">OYNA</button><button data-v10-tab="friends">ARKADAŞLAR <i id="v10Badge"></i></button><button data-v10-tab="leagues">LİGLER</button><button data-v10-tab="profile">PROFİL</button></nav><section id="v10PlayPanel"><div class="v10-hero" id="v10Hero"><div class="v10-rain" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="v10-eyebrow">GECENİN ARENASI · CANLI 1V1</span><h1 id="v10ModeTitle">KARANLIK<br><em>YAĞMUR</em></h1><p id="v10ModeHint">Aynı fırtına. İki rakip. Tek zafer.</p><button id="v10Play" class="v10-main">RAKİP BUL <span>↗</span></button><div class="v10-hero-links"><button id="v10PlayFriend">ARKADAŞINLA OYNA</button><button id="v10Practice">BOTLA ANTRENMAN</button></div></div><div class="v10-section-head"><h2>ARENANI SEÇ</h2><span>6 özgün oynanış · uzun mod temeli</span></div><div id="v10Modes" class="v10-modegrid"></div><div class="v10-options"><label>Bot gücü <select id="v10Difficulty"><option value="easy">Kolay</option><option value="normal" selected>Normal</option><option value="hard">Zor</option></select></label><label><input type="checkbox" id="v10AutoBot" checked> Rakip yoksa botla oyna</label></div><div id="v12CourseConfig" hidden><div class="v12-settings"><label>Parkur turu <select id="v12CourseRounds"><option value="3">3 tur</option><option value="5" selected>5 tur</option><option value="8">8 tur</option></select></label><label>Zorluk <select id="v12CourseLevel"><option value="1">Kolay</option><option value="2" selected>Normal</option><option value="3">Zor</option></select></label><label><input type="checkbox" id="v12CourseBlack"> Siyah ölüm topu</label></div></div><label id="v10CourseSeedLabel" class="v10-label" hidden>PARKUR TOHUMU (1–1000000)<input id="v10CourseSeed" type="number" min="1" max="1000000" value="2026"></label><p class="v10-note" id="v10Adaptation">Çevrimiçi: 12 dalga · 36 hedef · aynı parkur · canlı skor.</p><div class="v10-subactions"><button id="v10Solo">TEK BAŞINA · UZUN MOD</button><button id="v10Rewards">GÖREVLER & ÖDÜLLER</button></div></section><section id="v10FriendsPanel" hidden><div class="v10-heading"><h2>ARKADAŞLAR</h2><p>Arkadaşını ekle. Çevrimiçiyse aynı arenaya davet et.</p></div><div class="v10-code"><span>ARKADAŞ KODUN</span><button id="v10CopyCode">BAĞLAN</button></div><form id="v10AddForm" class="v10-inline"><input id="v10FriendCode" maxlength="8" placeholder="8 karakterli arkadaş kodu" aria-label="Arkadaş kodu"><button>EKLE</button></form><div id="v10Invites"></div><div id="v10Friends"></div></section><section id="v10LeaguesPanel" hidden><div class="v10-heading"><h2>LİGLER</h2><p>Bir lige katıl. Canlı düellolardan kazandığın puanları ligine taşı.</p></div><div class="v10-options"><label>Düellolarda temsil ettiğin lig <select id="v10ScoringLeague"><option value="">Bireysel oyna</option></select></label></div><details class="v10-details"><summary>LİG KUR / KODLA KATIL</summary><form id="v10CreateForm" class="v10-inline"><input id="v10LeagueName" maxlength="30" placeholder="Yeni lig adı" aria-label="Yeni lig adı"><button>KUR</button></form><form id="v10JoinForm" class="v10-inline"><input id="v10LeagueCode" maxlength="7" placeholder="7 karakterli lig kodu" aria-label="Lig kodu"><button>KATIL</button></form></details><div class="v10-section-head"><h3>LİGLER ARASI YARIŞ</h3><button id="v10RefreshBattle">YENİLE</button></div><div id="v10LeagueBattle"></div><div class="v10-section-head"><h3>TÜM LİGLER</h3><button id="v10RefreshLeagues">YENİLE</button></div><div id="v10Leagues"></div><button id="v10MoreLeagues" class="v10-full" hidden>DAHA FAZLA LİG</button><section id="v10RosterPanel" hidden><h3 id="v10RosterTitle"></h3><div class="v10-subactions"><button id="v10LeagueDuel">BU LİG İÇİN CANLI DÜELLO</button><button id="v10DailyLeague">GÜNLÜK LİG PARKURU</button></div><div id="v10Roster"></div></section></section><section id="v10ProfilePanel" hidden><div class="v10-heading"><h2>OYUNCU PROFİLİ</h2><p>Seviyenin sonu yok. Her tamamlanan mücadele yeni bir adım.</p></div><form id="v10ProfileForm"><label class="v10-label">TAKMA ADIN<input id="v10Alias" maxlength="18" autocomplete="nickname"></label><div class="v10-profile-stats"><div><b id="v10ProfileLevel">1</b><small>SEVİYE</small></div><div><b id="v10ProfileWins">0</b><small>ONLINE ZAFER</small></div><div><b id="v10ProfileMatches">0</b><small>XP KAZANILAN MAÇ</small></div></div><div class="v10-xp"><span id="v10XpBar"></span></div><p id="v10XpText" class="v10-note"></p><h3>SKİNLER</h3><div id="v10Skins" class="v10-skins"></div><button class="v10-full">PROFİLİ KAYDET</button></form><p class="v10-note">Online zafer ve lig puanı yalnızca iki gerçek oyuncunun sunucuda doğrulanmış maçlarından gelir. Bot/solo antrenman: en az 18 saniye, günde 20 XP ödülü. İnternetsiz antrenman ilerlemesi bu cihazda ayrıca saklanır.</p><p id="v10LocalProgress" class="v10-note"></p><details class="v10-details"><summary>DİĞER KOZMETİKLER VE GÖREVLER</summary><button id="v10LegacySkins" class="v10-full">KOLEKSİYONU AÇ</button><button id="v10LegacyQuests" class="v10-full">GÜNLÜK GÖREVLERİ AÇ</button></details></section><p id="v10Notice" class="v10-notice" role="status"></p>`;$('menuView').prepend(root);
 const modal=document.createElement('dialog');modal.id='v10Match';modal.className='v10-match';modal.innerHTML='<header><div><span id="v10MatchKind" class="v10-eyebrow">CANLI ARENA</span><h2 id="v10MatchTitle"></h2></div><button id="v10MatchClose" aria-label="Maçtan çık">✕</button></header><div id="v10Scoreboard"><div><small id="v10MeLabel">SEN</small><b id="v10MeScore">0</b></div><span>VS</span><div><small id="v10RivalLabel">RAKİP</small><b id="v10RivalScore">0</b></div></div><div class="v10-track"><i id="v10MatchTrack"></i></div><div id="v10Field"><div id="v10Countdown"></div></div><p id="v10MatchStatus" role="status"></p><small id="v10MatchWave"></small><div id="v10ResultButtons" hidden><button id="v10Rematch" class="v10-main">RÖVANŞ</button><button id="v10AddRival" hidden>RAKİBİ ARKADAŞ EKLE</button><button id="v10ResultHome">ANA MENÜ</button></div><button id="v10Retry" hidden>SONUCU TEKRAR GÖNDER</button>';document.body.append(modal);
 const notice=t=>$('v10Notice').textContent=t,matchStatus=t=>$('v10MatchStatus').textContent=t,error=e=>notice(bridge.friendly(e));
 function v25WaitPanel(s){
  const f=$('v10Field');if(!f||match!==s)return;
  const panel=document.createElement('section');panel.id='v25Waiting';panel.setAttribute('aria-label','Rakip bekleme');
- panel.innerHTML='<div class="v25-spinner" aria-hidden="true">✦</div><div class="v25-wait-title">GALAKTİK EŞLEŞME</div><p id="v25WaitText">Rakip aranıyor…</p><div id="v25WaitCount" class="v25-wait-count">20</div><button type="button" id="v25GoBot">🤖 BOTLA OYNA</button><small>20 saniye içinde rakip bulunamazsa botla devam edebilirsin.</small>';
+ panel.innerHTML='<div class="v25-spinner" aria-hidden="true">✦</div><div class="v25-wait-title">GALAKTİK EŞLEŞME</div><p id="v25WaitText">Rakip aranıyor…</p><div id="v25WaitCount" class="v25-wait-count">20</div><button type="button" id="v25GoBot">🤖 BOTLA OYNA</button><div class="v27-search-actions"><button type="button" id="v27KeepSearching">↻ ARAMAYA DEVAM</button><button type="button" id="v27Leave">⌂ ANA MENÜYE DÖN</button></div><small>20 saniye içinde rakip yoksa bot seçebilirsin; arkadaş davetleri botla oynanmaz.</small>';
  f.replaceChildren(panel);
  const button=$('v25GoBot');button.onclick=()=>startBot(true);
+ if(s.mode==='sync'||s.targetUid){button.hidden=true;}
+ const keep=$('v27KeepSearching');if(keep)keep.onclick=()=>v27ContinueSearch(s);
+ const leave=$('v27Leave');if(leave)leave.onclick=()=>closeMatch();
  s.waitPanel=panel;
  const tick=()=>{
   if(match!==s||s.done||s.startAt||s.bot){clearInterval(s.waitPulse);return;}
@@ -1728,6 +1746,16 @@ function v25WaitPanel(s){
   if(sec<=0&&$('v25GoBot'))$('v25GoBot').classList.add('v25-ready');
  };
  s.waitPulse=setInterval(tick,250);tick();
+}
+async function v27ContinueSearch(s){
+ if(match!==s||s.done||s.startAt||s.bot||s.switching)return;
+ s.deadline=Date.now()+20000;s.queueError='';clearTimeout(s.wait);clearTimeout(s.poll);
+ s.wait=setTimeout(()=>v25QueueExpired(s),20000);
+ matchStatus('Yeniden rakip aranıyor · 20 saniyelik yeni süre başladı.');
+ try{await ready();if(match!==s||s.done||s.bot)return;
+ if(!s.api){const n=bridge.net();s.api=Son1Arena.create(n.db,n.uid,n.mods.firestore);}
+ await poll();
+ }catch(e){if(match===s)matchStatus('Eşleşme henüz kurulamadı: '+bridge.friendly(e)+' · Bot veya ana menü kullanılabilir.');}
 }
 async function v25QueueExpired(s){
  if(match!==s||s.startAt||s.done||s.switching||s.bot)return;
@@ -1902,6 +1930,7 @@ async function v13DailyFinish(s,score){
  catch(e){if(match===s)matchStatus('Günlük sonuç bu cihazda kaydedildi. Sunucu sonucu doğrulayamadı: '+bridge.friendly(e));}
 }
 async function startBot(fromQueue=false){const s=match;if(!s)return;
+ if(s.mode==='sync'||s.targetUid){matchStatus('Senkron ve özel arkadaş davetleri yalnızca gerçek arkadaşla oynanır.');return;}
  if(s.mode==='daily'){
   if(v13Daily()){matchStatus(v13DailyText());s.done=true;$('v10ResultButtons').hidden=false;return;}
   let ticket=null;
@@ -2636,6 +2665,7 @@ const v9Level=()=>Math.max(1,Math.floor(Math.sqrt(Math.max(0,meta.xp)/165))+1);
 function v9ApplyStyle(){for(const type of ['arena','orb','trail','win']){const item=V9_ITEMS.find(x=>x.id===v9.equipped[type]&&x.type===type&&v9.owned.includes(x.id))||V9_ITEMS.find(x=>x.id===type+'-base');document.body.dataset['v9'+type]=item?.appearance||'default'}}
 function v9Owned(id){return v9.owned.includes(id)}
 function v9Earn(dust,xp){v9.dust+=dust;if(xp)awardXP(xp);v9Save();v9PaintBalances()}
+window.SON1_V27_REWARD=(dust,xp)=>v9Earn(dust,xp);
 function v9PaintBalances(){const balance=$('v9Balance');if(balance)balance.textContent=v9.dust.toLocaleString('tr-TR')+' ✦';const status=$('v9DailyStatus');if(status){v9EnsureDay();const claimed=Object.keys(v9.daily.claimed).filter(k=>v9.daily.claimed[k]).length;status.textContent=`${claimed}/6 uzun görev ödülü · ${v9.dust.toLocaleString('tr-TR')} ✦ Yıldız Tozu`}}
 let v9Tab='missions';
 function v9Open(tab='missions'){v9Tab=tab;renderCollection();v9Render();openDialog('collectionDialog')}
@@ -3369,8 +3399,10 @@ function state(){const week=utcWeek(),season=seasonKey();if(!saved)saved=parse()
 function store(){try{localStorage.setItem(storage,JSON.stringify(saved))}catch(e){}}
 const safeInt=n=>Math.max(0,Math.floor(Number(n)||0));
 const num=n=>Number(n||0).toLocaleString('tr-TR');
-function track(type,data){const s=state();const counters={};if(type==='hit'){counters.hits=1;counters.points=safeInt(data.points)}if(type==='round'&&data.boss)counters.boss=1;if(type==='match')counters.matches=1;if(type==='online')counters.online=1;for(const [key,n] of Object.entries(counters)){s.weekProgress[key]=safeInt(s.weekProgress[key])+n;s.seasonProgress[key]=safeInt(s.seasonProgress[key])+n;}store();}
-function claim(type,id){const s=state(),q=QUESTS[type].find(q=>q.id===id);if(!q)return;const progress=s[type==='weekly'?'weekProgress':'seasonProgress'];const claimed=s[type==='weekly'?'weekClaimed':'seasonClaimed'];if(claimed[id]||safeInt(progress[q.metric])<q.target)return;claimed[id]=true;store();try{v9Earn(q.dust,q.xp)}catch(e){/* reward system not ready */}draw(type);}
+function track(type,data){const s=state();const counters={};if(type==='hit'){counters.hits=1;counters.points=safeInt(data.points)}if(type==='verified'){counters.hits=safeInt(data.hits);counters.points=safeInt(data.points)}if(type==='round'&&data.boss)counters.boss=1;if(type==='match')counters.matches=1;if(type==='online')counters.online=1;for(const [key,n] of Object.entries(counters)){s.weekProgress[key]=safeInt(s.weekProgress[key])+n;s.seasonProgress[key]=safeInt(s.seasonProgress[key])+n;}store();}
+function claim(type,id){const s=state(),q=QUESTS[type].find(q=>q.id===id);if(!q)return;const progress=s[type==='weekly'?'weekProgress':'seasonProgress'];const claimed=s[type==='weekly'?'weekClaimed':'seasonClaimed'];if(claimed[id]||safeInt(progress[q.metric])<q.target)return;if(typeof window.SON1_V27_REWARD!=='function')return;
+ window.SON1_V27_REWARD(q.dust,q.xp);
+ claimed[id]=true;store();draw(type);}
 let current='weekly';
 function draw(type=current){current=type;const s=state(),panel=byId('v26MetaPanel');if(!panel)return;const progress=s[type==='weekly'?'weekProgress':'seasonProgress'];const claimed=s[type==='weekly'?'weekClaimed':'seasonClaimed'];panel.replaceChildren();const hero=document.createElement('div');hero.className='v26-meta-hero';const title=document.createElement('b');title.textContent=type==='weekly'?'HAFTALIK GÖREVLER':'SEZON GÖREVLERİ';const detail=document.createElement('small');detail.textContent=type==='weekly'?'Pazartesi yenilenir · '+s.week:'Aylık sezon · '+s.season+' · İlerleme bu cihazda tutulur';hero.append(title,detail);panel.append(hero);
  QUESTS[type].forEach(x=>{const n=Math.min(x.target,safeInt(progress[x.metric]));const done=!!claimed[x.id],card=document.createElement('div');card.className='v26-reward-card';const icon=document.createElement('span');icon.textContent=x.icon;icon.style.fontSize='26px';const copy=document.createElement('div');copy.className='copy';const name=document.createElement('strong');name.textContent=x.name;const desc=document.createElement('small');desc.textContent=x.desc;const amount=document.createElement('small');amount.textContent=`${num(n)} / ${num(x.target)} · +${x.dust} ✦ · +${x.xp} XP`;const progressBox=document.createElement('div');progressBox.className='progress';const progressBar=document.createElement('i');progressBar.style.width=Math.min(100,100*n/x.target)+'%';progressBox.append(progressBar);copy.append(name,desc,amount,progressBox);const btn=document.createElement('button');btn.type='button';btn.textContent=done?'ALINDI ✓':n>=x.target?'ÖDÜLÜ AL':'DEVAM';btn.disabled=done||n<x.target;btn.addEventListener('click',()=>claim(type,x.id));card.append(icon,copy,btn);panel.append(card)})
@@ -3389,5 +3421,50 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 
+<script id="v27-arena-fixes">
+/* SON 1 SANİYE V27 – non-destructive UX, diagnostics and Arena award bridge.
+ * The original V24/V25/V26 logic stays installed. Real scores always come from
+ * Son1V13Core, and network scores are never fabricated by this module.
+ */
+(()=>{'use strict';
+ const $=id=>document.getElementById(id);
+ const seen=new WeakMap();
+ const safe=(n)=>Math.max(0,Math.floor(Number(n)||0));
+ function trackArena(){
+  const s=window.Son1V13?.match?.();
+  if(!s||!s.game)return;
+  let m=seen.get(s);if(!m){m={completedStages:0,closed:false};seen.set(s,m);}
+  // Bot results are validated with the existing deterministic Arena engine.
+  // Online results are NOT counted until the existing server reports a saved match.
+  if(s.bot&&s.mine&&Array.isArray(s.mine.stages)){
+   const newly=s.mine.stages.slice(m.completedStages);
+   for(const stage of newly){
+    if(safe(stage.good)||safe(stage.points))window.SON1_V26?.track?.('verified',{hits:safe(stage.good),points:safe(stage.points)});
+    if(stage.boss&&stage.bossPassed)window.SON1_V26?.track?.('round',{boss:true});
+   }
+   m.completedStages=s.mine.stages.length;
+  }
+  if(!m.closed&&s.done&&s.mine?.status==='saved'){
+   m.closed=true;
+   window.SON1_V26?.track?.('match',{mode:s.mode});
+   if(!s.bot&&s.submitted&&s.rival?.status==='saved')window.SON1_V26?.track?.('online',{verified:true});
+  }
+ }
+ // No busy loop, constant memory per session, no touches to active DOM or engine.
+ const poll=setInterval(trackArena,500);
+ window.addEventListener('pagehide',()=>clearInterval(poll),{once:true});
+ function enhance(){
+  const label=$('v10Adaptation');if(label)label.textContent='Bot: uzun modun V13 hedef/puan kuralları · Gerçek 1v1: ayrıca sunucu doğrulaması gerektirir.';
+  const heading=$('v10Modes')?.previousElementSibling?.querySelector('span');if(heading&&heading.textContent.includes('9 ayrı'))heading.textContent='6 özgün Arena modu · uzun moddan türetilmiş kurallar';
+  const chip=$('v26PerfChip');if(chip)chip.remove();
+  document.querySelectorAll('[data-mode="challenge"],[data-mode="party"],[data-mode="course"]').forEach(e=>{if(e.closest('#v10Modes'))e.remove();});
+  const menu=$('v20FloatHome');if(menu)menu.hidden=true;
+  if($('v10Match'))$('v10Match').setAttribute('aria-label','SON 1 SANİYE tam ekran Arena');
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',enhance,{once:true});else enhance();
+ window.SON1_V27={version:'27.0-local-test',trackArena,metrics:()=>{const s=window.Son1V13?.match?.();return s?{mode:s.mode,bot:!!s.bot,stages:s.completed,done:!!s.done,serverSaved:!!s.submitted}:null;}};
+})();
+
+</script>
 </body>
 </html>
