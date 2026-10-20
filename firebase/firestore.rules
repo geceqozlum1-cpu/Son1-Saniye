@@ -401,16 +401,7 @@ service cloud.firestore {
 
   // VOL31: unranked player-vs-player match rooms. No leaderboard or XP writes.
   function v30Modes(m) { return m in ['classic','rise','fall','endless','sync']; }
-  function v30Slot(id,m) {
-    return id.matches('^(classic|rise|fall|endless|sync)-([0-9]|[1-5][0-9]|6[0-3])
- }
-}
-)
-      && id.matches('^' + m + '-.*
- }
-}
-);
-  }
+  function v30Slot(id,m) { return id.matches('^(classic|rise|fall|endless|sync)-([0-9]|[1-5][0-9]|6[0-3])$') && id.matches('^' + m + '-.*$'); }
   function v30Course(o) {
     return o is map && o.keys().hasAll(['rounds','level','black']) && o.keys().hasOnly(['rounds','level','black'])
       && o.rounds is int && o.rounds>=1 && o.rounds<=25 && o.level is int && o.level<=10 && o.level>=1 && o.black is bool;
@@ -423,11 +414,8 @@ service cloud.firestore {
       && d.targetUid is string && d.targetUid.size()<=128 && d.targetUid!=request.auth.uid
       && d.host==request.auth.uid && d.hostAlias is string && d.hostAlias.size()>0 && d.hostAlias.size()<=18
       && d.guest=='' && d.guestAlias=='' && d.status=='waiting'
-      && d.generation is string && d.generation.matches('^[a-f0-9-]{36}
- }
-}
-)
-      && d.seed is int && d.seed>=1 && d.seed<=1000000
+      && d.generation is string && d.generation.matches('^[a-f0-9-]{36}$')
+       && d.seed is int && d.seed>=1 && d.seed<=1000000
       && d.dayKey is int && d.dayKey>=19000 && d.dayKey<=27000
       && v30Course(d.courseOptions) && d.createdAt==request.time && d.joinedAt==null;
   }
