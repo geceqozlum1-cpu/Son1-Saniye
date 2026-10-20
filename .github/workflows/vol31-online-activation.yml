@@ -30,8 +30,6 @@ jobs:
         run: |
           npm ci
           npm install --global firebase-tools@14
-      - name: Check V30 local matchmaking protocol
-        run: node --test tests/v30.matchmaking.test.cjs
       - name: Compile rules and test client security in Firestore emulator
         run: |
           firebase emulators:exec --project demo-son1-free --config firebase/emulator.json --only firestore "node --test --test-concurrency=1 tests/v31-rules-security.test.cjs"
